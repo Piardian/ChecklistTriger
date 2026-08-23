@@ -1,69 +1,143 @@
-# ChecklistTrigger — Market Structure Analysis Engine
+# ChecklistTrigger
 
-A TypeScript/Node.js event-driven market-analysis engine for EUR/USD and GBP/USD. The system combines market-structure detection, price-action concepts, quality scoring, persistence, scheduled data polling, and Telegram delivery.
+**Event-Driven Market Structure Analysis & Alerting Engine**
 
-## Pipeline
+ChecklistTrigger is a TypeScript/Node.js market-analysis system that ingests multi-timeframe candle data, evaluates market-structure conditions, scores potential setups, and delivers candidate alerts through Telegram.
+
+The project is structured as an event-driven data pipeline rather than a single indicator script.
+
+## Architecture
 
 ```text
-Twelve Data API
-      ↓
-Candle Poller
-      ↓
-Candle Store
-      ↓
-Market Structure Analysis
-      ↓
-POI / Model Evaluation
-      ↓
-Grade Calculation
-      ↓
-Candidate Opportunity
-      ↓
-Telegram Notification
+                    Twelve Data API
+                           │
+                           ▼
+                     Candle Poller
+                           │
+                           ▼
+                      Candle Store
+                           │
+                           ▼
+                Market Structure Engine
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+            BOS/CHoCH    Sweeps     Range Logic
+              │            │            │
+              └────────────┼────────────┘
+                           ▼
+                    POI / Model Layer
+                           │
+                           ▼
+                     Grade Engine
+                           │
+                           ▼
+                  Candidate Opportunity
+                           │
+                           ▼
+                   Telegram Delivery
 ```
 
-## Analysis components
+## What it analyzes
 
-The current engine includes implementations for:
+The current analysis pipeline includes:
 
 - Swing detection
-- BOS / CHoCH
+- Break of Structure (BOS)
+- Change of Character (CHoCH)
 - Range detection
 - Liquidity sweep detection
 - Order Blocks
-- Fair Value Gaps
+- Fair Value Gaps (FVG)
 - Premium / Discount classification
-- Displacement quality scoring
+- Displacement quality
 - POI test tracking
 - Model determination
 - Grade calculation
 
-## Runtime components
+The system is currently focused on EUR/USD and GBP/USD workflows.
 
-- `server/twelveDataClient.ts` — Twelve Data market-data client
-- `server/poller.ts` — scheduled data acquisition and pipeline orchestration
-- `server/index.ts` — runtime startup, scheduling, and health endpoint
-- `src/` — analysis and domain logic
-- `tests/` — automated validation
+## Runtime architecture
 
-The runtime uses different polling intervals for 15m, 1h, and 4h data and performs a controlled cold start to avoid unnecessary API pressure.
+```text
+server/
+├── twelveDataClient.ts   Market-data client
+├── poller.ts             Scheduled acquisition + orchestration
+└── index.ts              Runtime startup + health endpoint
 
-## Development
+src/                       Analysis and domain logic
+tests/                     Automated validation
+```
+
+The runtime uses different polling intervals for 15m, 1h, and 4h data and performs a controlled cold-start sequence to avoid unnecessary API pressure.
+
+## Quick start
+
+Install dependencies:
 
 ```bash
 npm install
+```
+
+Run tests:
+
+```bash
 npm test
+```
+
+Build the project:
+
+```bash
 npm run build
 ```
 
-The service exposes `GET /health` for deployment/runtime health checks.
+The service exposes a `GET /health` endpoint for runtime health checks.
 
 ## Engineering focus
 
-This project is primarily an engineering exercise in deterministic market-data processing and event-driven automation. The objective is to make the analysis pipeline explicit, testable, and observable rather than hide the logic behind a single monolithic script.
+The main engineering objective is to make market-data processing deterministic, modular, testable, and observable.
+
+Instead of hiding all logic behind a single signal function, the pipeline separates:
+
+1. Data acquisition
+2. Candle persistence
+3. Market-structure detection
+4. POI/model evaluation
+5. Candidate grading
+6. Notification delivery
+
+This separation makes individual stages easier to validate and evolve.
+
+## Validation
+
+The repository contains automated tests and a GitHub Actions quality workflow that runs the test and build pipeline on repository changes.
+
+## Design considerations
+
+The system is designed for continuously updated market data, so operational concerns matter alongside analysis logic. Polling cadence, cold-start behavior, API pressure, persistence, health checks, and notification delivery are treated as first-class runtime concerns.
+
+## Limitations
+
+- Market data depends on the upstream Twelve Data API
+- Analysis outputs are experimental
+- Setup grades are not guarantees of market outcomes
+- The project is not a live execution or profitability system
+- Results should not be interpreted as financial advice
+
+## Roadmap
+
+- Broader instrument and timeframe support
+- More comprehensive historical validation
+- Expanded event and candidate lifecycle tracking
+- Improved observability and reporting
+- Additional automated regression scenarios
+
+## Technology
+
+TypeScript · Node.js · Jest · REST APIs · Market Data · Event-Driven Systems · Telegram · Automated Testing
 
 ## Status
 
-**Active development / research prototype.**
+**Active development / research prototype**
 
-The analysis outputs are experimental and are not financial advice or a claim of predictive trading performance.
+ChecklistTrigger is an engineering project for deterministic market-data analysis and event-driven alerting.
