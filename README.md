@@ -1,35 +1,69 @@
-# Phase 10 (v2): Swing, BOS/CHoCH, Range, Sweep, OB, FVG, Premium/Discount, Displacement Quality, POI Test Tracking, Model Determination, Grade Calculation, Twelve Data Poller, Candle Store, and Telegram Sender Core Engine
+# ChecklistTrigger — Market Structure Analysis Engine
 
-EUR/USD ve GBP/USD pariteleri için swing noktası, BOS/CHoCH, Range, Sweep tespiti, Order Block (OB), Fair Value Gap (FVG), Premium/Discount (Fib) sınıflandırma, Displacement Kalitesi skorlama, POI test sayısı takip, Model 1/2 belirleme, Grade Puanlama, Twelve Data Poller, Candle Store ve Telegram Bildirim Gönderim motorudur.
+A TypeScript/Node.js event-driven market-analysis engine for EUR/USD and GBP/USD. The system combines market-structure detection, price-action concepts, quality scoring, persistence, scheduled data polling, and Telegram delivery.
 
-## Kurulum ve Test
+## Pipeline
 
-Bağımlılıkları yüklemek ve testleri çalıştırmak için projenin dizininde (`C:\Users\piard\.gemini\antigravity\scratch\swing-bos-core`) aşağıdaki komutları kullanın:
+```text
+Twelve Data API
+      ↓
+Candle Poller
+      ↓
+Candle Store
+      ↓
+Market Structure Analysis
+      ↓
+POI / Model Evaluation
+      ↓
+Grade Calculation
+      ↓
+Candidate Opportunity
+      ↓
+Telegram Notification
+```
+
+## Analysis components
+
+The current engine includes implementations for:
+
+- Swing detection
+- BOS / CHoCH
+- Range detection
+- Liquidity sweep detection
+- Order Blocks
+- Fair Value Gaps
+- Premium / Discount classification
+- Displacement quality scoring
+- POI test tracking
+- Model determination
+- Grade calculation
+
+## Runtime components
+
+- `server/twelveDataClient.ts` — Twelve Data market-data client
+- `server/poller.ts` — scheduled data acquisition and pipeline orchestration
+- `server/index.ts` — runtime startup, scheduling, and health endpoint
+- `src/` — analysis and domain logic
+- `tests/` — automated validation
+
+The runtime uses different polling intervals for 15m, 1h, and 4h data and performs a controlled cold start to avoid unnecessary API pressure.
+
+## Development
 
 ```bash
 npm install
 npm test
-```
-
-Projeyi derlemek (production build) için:
-```bash
 npm run build
 ```
 
----
+The service exposes `GET /health` for deployment/runtime health checks.
 
-## Modüller ve Kullanım Rehberleri
+## Engineering focus
 
-### 1. Twelve Data İstemcisi (`server/twelveDataClient.ts`)
-`https://api.twelvedata.com/time_series` üzerinden API anahtarı (`TWELVE_DATA_API_KEY`) ile mum verisi çeker. Çekilen mumlar UTC zaman diliminde parse edilip en eskiden en yeniye sıralanır.
+This project is primarily an engineering exercise in deterministic market-data processing and event-driven automation. The objective is to make the analysis pipeline explicit, testable, and observable rather than hide the logic behind a single monolithic script.
 
-### 2. Poller Orkestratörü (`server/poller.ts`)
-Belirli aralıklarla Twelve Data API'den veri çeker. Eğer store boş ise (cold start) 100 mum, aksi takdirde 10 mum çekerek `CandleStore`'u günceller. 15m verisi güncellendiğinde orkestrasyon pipeline'ını tetikler ve aday fırsatları Telegram'a iletir.
+## Status
 
-### 3. Zamanlayıcı ve Health Check (`server/index.ts`)
-Sunucu başlarken tüm 6 ticker/zaman dilimi kombinasyonunu paralel olmayan (`await` ile ardışık) şekilde çekerek rate limitlerini aşmadan cold-start verilerini toplar. Ardından her kombinasyon için zamanlayıcıları (`setInterval`) kurar:
-- 15m kombinasyonları için: 15 dakikada bir.
-- 1h kombinasyonları için: 1 saatte bir.
-- 4h kombinasyonları için: 4 saatte bir.
+**Active development / research prototype.**
 
-Ayrıca Render/Railway gibi platformların health-check pingleri için `GET /health` endpoint'ini barındıran Express sunucusunu ayağa kaldırır.
+The analysis outputs are experimental and are not financial advice or a claim of predictive trading performance.
