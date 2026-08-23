@@ -9,38 +9,26 @@ The project is structured as an event-driven data pipeline rather than a single 
 ## Architecture
 
 ```text
-                    Twelve Data API
-                           │
-                           ▼
-                     Candle Poller
-                           │
-                           ▼
-                      Candle Store
-                           │
-                           ▼
-                Market Structure Engine
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-            BOS/CHoCH    Sweeps     Range Logic
-              │            │            │
-              └────────────┼────────────┘
-                           ▼
-                    POI / Model Layer
-                           │
-                           ▼
-                     Grade Engine
-                           │
-                           ▼
-                  Candidate Opportunity
-                           │
-                           ▼
-                   Telegram Delivery
+Twelve Data API
+      ↓
+Candle Poller
+      ↓
+Candle Store
+      ↓
+Market Structure Engine
+      ↓
+POI / Model Evaluation
+      ↓
+Grade Engine
+      ↓
+Candidate Opportunity
+      ↓
+Telegram Delivery
 ```
 
-## What it analyzes
+## Analysis pipeline
 
-The current analysis pipeline includes:
+The current analysis layer includes:
 
 - Swing detection
 - Break of Structure (BOS)
@@ -57,6 +45,12 @@ The current analysis pipeline includes:
 
 The system is currently focused on EUR/USD and GBP/USD workflows.
 
+## Evidence & validation
+
+The repository contains dedicated tests for analysis and runtime components, including benchmark-oriented evaluation, decision/execution flows, evidence recording, and displacement-quality scoring.
+
+The benchmark layer is designed to work with validated datasets and track measurable outcomes such as coverage, evaluation duration, MFE/MAE, and deterministic dataset fingerprints. These are evaluation mechanisms, not claims of trading profitability or predictive accuracy.
+
 ## Runtime architecture
 
 ```text
@@ -71,33 +65,21 @@ tests/                     Automated validation
 
 The runtime uses different polling intervals for 15m, 1h, and 4h data and performs a controlled cold-start sequence to avoid unnecessary API pressure.
 
-## Quick start
+## Demo / operational entry points
 
-Install dependencies:
+The repository includes preview and visualization entry points for inspecting system behavior, in addition to the normal test/build workflow.
 
 ```bash
 npm install
-```
-
-Run tests:
-
-```bash
 npm test
-```
-
-Build the project:
-
-```bash
 npm run build
 ```
 
 The service exposes a `GET /health` endpoint for runtime health checks.
 
-## Engineering focus
+## Technical design
 
-The main engineering objective is to make market-data processing deterministic, modular, testable, and observable.
-
-Instead of hiding all logic behind a single signal function, the pipeline separates:
+The pipeline deliberately separates:
 
 1. Data acquisition
 2. Candle persistence
@@ -106,20 +88,19 @@ Instead of hiding all logic behind a single signal function, the pipeline separa
 5. Candidate grading
 6. Notification delivery
 
-This separation makes individual stages easier to validate and evolve.
+This separation makes individual stages easier to test and allows runtime concerns such as polling cadence, API pressure, persistence, health checks, and notification delivery to be handled independently from analysis logic.
 
-## Validation
+## Testing & CI
 
-The repository contains automated tests and a GitHub Actions quality workflow that runs the test and build pipeline on repository changes.
+The repository contains automated tests and a GitHub Actions workflow that runs the test and build pipeline on repository changes.
 
-## Design considerations
-
-The system is designed for continuously updated market data, so operational concerns matter alongside analysis logic. Polling cadence, cold-start behavior, API pressure, persistence, health checks, and notification delivery are treated as first-class runtime concerns.
+The test suite is organized around domain behavior rather than only end-to-end smoke tests, allowing individual analysis and execution components to be evaluated independently.
 
 ## Limitations
 
 - Market data depends on the upstream Twelve Data API
 - Analysis outputs are experimental
+- Benchmark metrics describe the evaluated datasets and scenarios only
 - Setup grades are not guarantees of market outcomes
 - The project is not a live execution or profitability system
 - Results should not be interpreted as financial advice
