@@ -1,5 +1,15 @@
 import { Candle, SwingPoint, StructureEvent, StructureState, RegimeTransition } from './types';
 
+const EPSILON = 0.000001;
+
+function isGreater(a: number, b: number): boolean {
+  return a > b + EPSILON;
+}
+
+function isLess(a: number, b: number): boolean {
+  return a < b - EPSILON;
+}
+
 /**
  * Detects BOS (Break of Structure) and CHoCH (Change of Character) events.
  * 
@@ -46,9 +56,9 @@ export function detectStructure(candles: Candle[], swings: SwingPoint[]): Struct
         const l1 = confirmedLows[confirmedLows.length - 2];
         const l2 = confirmedLows[confirmedLows.length - 1];
 
-        if (h2.price > h1.price && l2.price > l1.price) {
+        if (isGreater(h2.price, h1.price) && isGreater(l2.price, l1.price)) {
           currentTrend = 'bullish';
-        } else if (h2.price < h1.price && l2.price < l1.price) {
+        } else if (isLess(h2.price, h1.price) && isLess(l2.price, l1.price)) {
           currentTrend = 'bearish';
         } else {
           currentTrend = 'range';
@@ -64,7 +74,7 @@ export function detectStructure(candles: Candle[], swings: SwingPoint[]): Struct
         const closePrice = candles[idx].close;
 
         // Check if last confirmed swing low is broken (CHoCH)
-        if (closePrice < lastLow.price && !brokenSwings.has(getSwingKey(lastLow))) {
+        if (isLess(closePrice, lastLow.price) && !brokenSwings.has(getSwingKey(lastLow))) {
           const event: StructureEvent = {
             type: 'CHoCH',
             direction: 'bearish',
@@ -79,7 +89,7 @@ export function detectStructure(candles: Candle[], swings: SwingPoint[]): Struct
           brokenSwings.add(getSwingKey(lastLow));
         }
         // Check if last confirmed swing high is broken (BOS)
-        else if (closePrice > lastHigh.price && !brokenSwings.has(getSwingKey(lastHigh))) {
+        else if (isGreater(closePrice, lastHigh.price) && !brokenSwings.has(getSwingKey(lastHigh))) {
           const event: StructureEvent = {
             type: 'BOS',
             direction: 'bullish',
@@ -99,7 +109,7 @@ export function detectStructure(candles: Candle[], swings: SwingPoint[]): Struct
         const closePrice = candles[idx].close;
 
         // Check if last confirmed swing high is broken (CHoCH)
-        if (closePrice > lastHigh.price && !brokenSwings.has(getSwingKey(lastHigh))) {
+        if (isGreater(closePrice, lastHigh.price) && !brokenSwings.has(getSwingKey(lastHigh))) {
           const event: StructureEvent = {
             type: 'CHoCH',
             direction: 'bullish',
@@ -114,7 +124,7 @@ export function detectStructure(candles: Candle[], swings: SwingPoint[]): Struct
           brokenSwings.add(getSwingKey(lastHigh));
         }
         // Check if last confirmed swing low is broken (BOS)
-        else if (closePrice < lastLow.price && !brokenSwings.has(getSwingKey(lastLow))) {
+        else if (isLess(closePrice, lastLow.price) && !brokenSwings.has(getSwingKey(lastLow))) {
           const event: StructureEvent = {
             type: 'BOS',
             direction: 'bearish',
