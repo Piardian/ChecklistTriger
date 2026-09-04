@@ -67,14 +67,16 @@ export function buildDefaultExecutionView(candidate: NotificationCandidate): Exe
     executionReady: false,
     tradableNow: false,
     reason: candidate.gradeResult.entryAllowed
-      ? 'Giriş bölgesine geri çekilme ve 1 dakikalık alt zaman dilimi onayı bekleniyor.'
+      ? (inZone
+          ? 'Fiyat giriş bölgesinde; 1 dakikalık LTF onay mumu bekleniyor.'
+          : 'Fiyat giriş bölgesinin dışında; bölgeye geri dönmeden (retest) işlem yapılmaz.')
       : (candidate.gradeResult.blockReasons[0] ?? 'Grade seviyesindeki bildirim politikası bu sinyali engelledi.'),
     requiredAction: inZone
-      ? `${signal.actionText} - 1 dakikalık manuel onay bekle`
-      : 'Geri çekilmeyi bekle',
+      ? `${signal.actionText} - Fiyat giriş bölgesinde; 1 dakikalık manuel onay bekle`
+      : 'Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.',
     requiredConfirmation: inZone
-      ? '1 dakikalık onay gerekli - manuel / otomatik değil'
-      : 'Önce giriş bölgesine geri çekilme, sonra 1 dakikalık manuel onay',
+      ? 'Fiyat bölgede. 1 dakikalık LTF onay mumu gerekli (manuel onay / otomatik değil)'
+      : 'Fiyat giriş bölgesinde değil. Önce bölgeye retest, ardından 1 dakikalık manuel onay.',
     checklist: Object.freeze([
       { label: 'HTF Uyumu', status: scoreToChecklist(candidate.gradeResult.breakdown.htfBiasPD) },
       { label: 'Yapı', status: scoreToChecklist(candidate.gradeResult.breakdown.structure) },
@@ -93,6 +95,8 @@ export function buildDefaultExecutionView(candidate: NotificationCandidate): Exe
   });
 }
 
+import { formatPrice, calculateDistance } from '../src/assetMetrics';
+
 export function extractCandidateDisplay(candidate: NotificationCandidate) {
   const { poiType, poi, tradeDirection, currentPrice } = candidate;
   const signalId = candidate.signalId ?? candidate.uniqueKey;
@@ -101,16 +105,14 @@ export function extractCandidateDisplay(candidate: NotificationCandidate) {
   const polarText = tradeDirection === 'long' ? 'Yükseliş' : 'Düşüş';
   const zoneHigh = poiType === 'OB' ? (poi as OrderBlock).high : (poi as FVG).gapHigh;
   const zoneLow = poiType === 'OB' ? (poi as OrderBlock).low : (poi as FVG).gapLow;
-  const nearestZoneEdge = currentPrice > zoneHigh ? zoneHigh : zoneLow;
-  const relation = currentPrice > zoneHigh ? 'giriş bölgesinin üstünde' : 'giriş bölgesinin altında';
-  const distance = Math.abs(currentPrice - nearestZoneEdge) / pipSize(candidate.symbol);
-  const priceInZone = currentPrice >= zoneLow && currentPrice <= zoneHigh;
+  const distInfo = calculateDistance(candidate.symbol, currentPrice, zoneLow, zoneHigh);
+  const priceInZone = distInfo.isInZone;
   const requiredAction = priceInZone
-    ? `${actionText} - 1 dakikalık manuel onay bekle`
-    : 'Geri çekilmeyi bekle';
+    ? `${actionText} - Fiyat giriş bölgesinde; 1 dakikalık manuel onay bekle`
+    : 'Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.';
   const requiredConfirmation = priceInZone
-    ? '1 dakikalık onay gerekli - manuel / otomatik değil'
-    : 'Önce giriş bölgesine geri çekilme, sonra 1 dakikalık manuel onay';
+    ? 'Fiyat bölgede. 1 dakikalık LTF onay mumu gerekli (manuel onay / otomatik değil)'
+    : 'Fiyat giriş bölgesinde değil. Önce bölgeye retest, ardından 1 dakikalık manuel onay.';
 
   return Object.freeze({
     signalId,
@@ -124,7 +126,7 @@ export function extractCandidateDisplay(candidate: NotificationCandidate) {
       ? `Altı ${formatPrice(zoneLow, candidate.symbol)} - manuel onay`
       : `Üstü ${formatPrice(zoneHigh, candidate.symbol)} - manuel onay`,
     currentPriceText: formatPrice(currentPrice, candidate.symbol),
-    distanceText: `${distance.toFixed(1)} ${candidate.symbol.includes('JPY') ? 'point' : 'pip'} ${relation}`,
+    distanceText: distInfo.displayText,
     requiredAction,
     requiredConfirmation,
   });
@@ -134,12 +136,4 @@ function scoreToChecklist(score: number): ChecklistStatus {
   if (score >= 1) return 'PASS';
   if (score === 0) return 'WAITING';
   return 'FAIL';
-}
-
-function formatPrice(value: number, symbol: string): string {
-  return value.toFixed(symbol.includes('JPY') ? 3 : 5);
-}
-
-function pipSize(symbol: string): number {
-  return symbol.includes('JPY') ? 0.01 : 0.0001;
 }

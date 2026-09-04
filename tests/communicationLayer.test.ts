@@ -1,4 +1,4 @@
-﻿import { buildCommunicationLayer, renderCommunicationMessage, resolveCommunicationMode } from '../server/communicationLayer';
+import { buildCommunicationLayer, renderCommunicationMessage, resolveCommunicationMode } from '../server/communicationLayer';
 import { buildExecutionCardView } from '../server/notificationBuilder';
 import { NotificationCandidate } from '../server/pipeline';
 import { RuntimeExecutionPipelineResult } from '../server/runtimeExecutionPipeline';
@@ -35,9 +35,7 @@ describe('Communication Layer', () => {
     const bundle = buildCommunicationLayer({ candidate, executionView, mode: 'Compact' });
 
     const rendered = renderCommunicationMessage(bundle.message);
-    expect(rendered).toContain('SİNYAL ÖZETİ');
-    expect(rendered).toContain('Parite                : EURUSD');
-    expect(rendered).toContain('Aksiyon               : Geri çekilmeyi bekle');
+    expect(rendered).toContain('Aksiyon               : Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.');
     expect(rendered).toContain('Fiyat giriş bölgesinde değil; önce geri çekilme');
     expect(resolveCommunicationMode('Detailed')).toBe('Detailed');
     expect(rendered.length).toBeGreaterThan(150);

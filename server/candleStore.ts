@@ -52,10 +52,19 @@ export class CandleStore {
       candles = candles.slice(candles.length - 500);
     }
 
-    // Atomic write logic: write to temp file then rename
-    const tempFilePath = `${filePath}.tmp`;
-    fs.writeFileSync(tempFilePath, JSON.stringify(candles, null, 2), 'utf8');
-    fs.renameSync(tempFilePath, filePath);
+    // Safe atomic write logic
+    const tempFilePath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 6)}.tmp`;
+    try {
+      fs.writeFileSync(tempFilePath, JSON.stringify(candles, null, 2), 'utf8');
+      try {
+        fs.renameSync(tempFilePath, filePath);
+      } catch {
+        fs.copyFileSync(tempFilePath, filePath);
+        try { fs.unlinkSync(tempFilePath); } catch {}
+      }
+    } catch {
+      fs.writeFileSync(filePath, JSON.stringify(candles, null, 2), 'utf8');
+    }
   }
 
   getCandles(symbol: Symbol, timeframe: Timeframe): StoredCandle[] {

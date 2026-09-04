@@ -1,4 +1,4 @@
-﻿import type { CommunicationBundle, CommunicationDecisionLog, CommunicationMessage, CommunicationMessageQualityValidation, CommunicationMode, CommunicationSection } from '../src/communicationModel';
+import type { CommunicationBundle, CommunicationDecisionLog, CommunicationMessage, CommunicationMessageQualityValidation, CommunicationMode, CommunicationSection } from '../src/communicationModel';
 import type { FVG, OrderBlock } from '../src/types';
 import type { NotificationCandidate } from './pipeline';
 import type { ExecutionCardView } from './telegramFormatter';
@@ -320,27 +320,27 @@ function buildActionSummary(executionView: ExecutionCardView, signal: ReturnType
 function buildStatusSummary(executionView: ExecutionCardView, signal: ReturnType<typeof extractCandidateDisplay>): string {
   if (executionView.executionStatus === 'BLOCKED') return 'Bekleme yok — sinyal bloke edildi.';
   if (executionView.executionStatus === 'CANCELLED') return 'Bekleme yok — sinyal iptal edildi.';
-  if (signal.requiredAction === 'Geri çekilmeyi bekle') return 'Fiyat hâlâ giriş bölgesinin dışında.';
+  if (signal.requiredAction.includes('retest') || signal.requiredAction === 'Geri çekilmeyi bekle') return 'Fiyat hâlâ giriş bölgesinin dışında.';
   return 'Fiyat giriş bölgesine yakın veya içinde.';
 }
 
 function normalizeRequiredAction(signal: ReturnType<typeof extractCandidateDisplay>, action: string): string {
-  if (signal.requiredAction === 'Geri çekilmeyi bekle') {
-    return 'Geri çekilmeyi bekle';
+  if (signal.requiredAction.includes('retest') || signal.requiredAction.includes('Giriş bölgesine geri çekilme') || signal.requiredAction === 'Geri çekilmeyi bekle') {
+    return 'Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.';
   }
   if (action.includes('BUY AFTER MANUAL CONFIRMATION') || action.includes('SELL AFTER MANUAL CONFIRMATION')) {
     return `${signal.actionText} - 1 dakikalık manuel onay bekle`;
   }
   if (action.includes('WAIT FOR RETEST') || action.includes('Geri çekilmeyi bekle')) {
-    return 'Geri çekilmeyi bekle';
+    return 'Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.';
   }
   return action;
 }
 
 function normalizeRequiredConfirmation(confirmation: string, actionLine: string): string {
-  if (confirmation.includes('manual 1M confirmation') || confirmation.includes('1 dakikalık manuel onay')) {
-    return actionLine === 'Geri çekilmeyi bekle'
-      ? 'Fiyat giriş bölgesinde değil; önce geri çekilme, sonra 1 dakikalık manuel onay.'
+  if (confirmation.includes('manual 1M confirmation') || confirmation.includes('1 dakikalık manuel onay') || confirmation.includes('onay')) {
+    return actionLine.includes('retest') || actionLine.includes('Giriş bölgesine geri çekilme') || actionLine === 'Geri çekilmeyi bekle'
+      ? 'Fiyat giriş bölgesinde değil; önce geri çekilme (retest), sonra 1 dakikalık manuel onay.'
       : 'Fiyat giriş bölgesinde; 1 dakikalık manuel onay bekle.';
   }
   return confirmation;
@@ -453,6 +453,8 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+import { formatPrice, calculateDistance } from '../src/assetMetrics';
+
 function extractCandidateDisplay(candidate: NotificationCandidate) {
   const { poiType, poi, tradeDirection, currentPrice } = candidate;
   const ob = poiType === 'OB' ? (poi as OrderBlock) : null;
@@ -463,16 +465,14 @@ function extractCandidateDisplay(candidate: NotificationCandidate) {
   const polarText = tradeDirection === 'long' ? 'Yükseliş' : 'Düşüş';
   const zoneHigh = poiType === 'OB' ? (ob?.high ?? 0) : (fvg?.gapHigh ?? 0);
   const zoneLow = poiType === 'OB' ? (ob?.low ?? 0) : (fvg?.gapLow ?? 0);
-  const nearestZoneEdge = currentPrice > zoneHigh ? zoneHigh : zoneLow;
-  const relation = currentPrice > zoneHigh ? 'giriş bölgesinin üstünde' : 'giriş bölgesinin altında';
-  const distance = Math.abs(currentPrice - nearestZoneEdge) / pipSize(candidate.symbol);
-  const priceInZone = currentPrice >= zoneLow && currentPrice <= zoneHigh;
+  const distInfo = calculateDistance(candidate.symbol, currentPrice, zoneLow, zoneHigh);
+  const priceInZone = distInfo.isInZone;
   const requiredAction = priceInZone
-    ? `${actionText} - 1 dakikalık manuel onay bekle`
-    : 'Geri çekilmeyi bekle';
+    ? `${actionText} - Fiyat giriş bölgesinde; 1 dakikalık manuel onay bekle`
+    : 'Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.';
   const requiredConfirmation = priceInZone
-    ? '1 dakikalık onay gerekli - manuel / otomatik değil'
-    : 'Önce giriş bölgesine geri çekilme, sonra 1 dakikalık manuel onay';
+    ? 'Fiyat bölgede. 1 dakikalık LTF onay mumu gerekli (manuel onay / otomatik değil)'
+    : 'Fiyat giriş bölgesinde değil. Önce bölgeye retest, ardından 1 dakikalık manuel onay.';
 
   return Object.freeze({
     signalId,
@@ -486,16 +486,8 @@ function extractCandidateDisplay(candidate: NotificationCandidate) {
       ? `Altı ${formatPrice(zoneLow, candidate.symbol)} - manuel onay`
       : `Üstü ${formatPrice(zoneHigh, candidate.symbol)} - manuel onay`,
     currentPriceText: formatPrice(currentPrice, candidate.symbol),
-    distanceText: `${distance.toFixed(1)} ${candidate.symbol.includes('JPY') ? 'point' : 'pip'} ${relation}`,
+    distanceText: distInfo.displayText,
     requiredAction,
     requiredConfirmation,
   });
-}
-
-function pipSize(symbol: string): number {
-  return symbol.includes('JPY') ? 0.01 : 0.0001;
-}
-
-function formatPrice(value: number, symbol: string): string {
-  return value.toFixed(symbol.includes('JPY') ? 3 : 5);
 }

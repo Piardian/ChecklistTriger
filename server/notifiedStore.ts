@@ -70,9 +70,18 @@ export class NotifiedStore {
       keys = keys.slice(keys.length - 500);
     }
 
-    // Atomic write logic
-    const tempFilePath = `${filePath}.tmp`;
-    fs.writeFileSync(tempFilePath, JSON.stringify(keys, null, 2), 'utf8');
-    fs.renameSync(tempFilePath, filePath);
+    // Safe atomic write logic
+    const tempFilePath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 6)}.tmp`;
+    try {
+      fs.writeFileSync(tempFilePath, JSON.stringify(keys, null, 2), 'utf8');
+      try {
+        fs.renameSync(tempFilePath, filePath);
+      } catch {
+        fs.copyFileSync(tempFilePath, filePath);
+        try { fs.unlinkSync(tempFilePath); } catch {}
+      }
+    } catch {
+      fs.writeFileSync(filePath, JSON.stringify(keys, null, 2), 'utf8');
+    }
   }
 }

@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Symbol } from './candleStore';
 import type { NotificationCandidate } from './pipeline';
+import type { SignalBenchmark } from '../src/signalBenchmark';
 import { recordDeliveryQueueTelemetry } from './telemetry';
 import { UNIVERSE_VERSION, universeCohort } from './universe';
 
@@ -19,6 +20,7 @@ export interface QueuedSignalDelivery {
   readonly signalId: string;
   readonly symbol: Symbol;
   readonly candidate: NotificationCandidate;
+  readonly benchmark?: SignalBenchmark;
   readonly signalCreatedAt: string;
   readonly validationPassedAt: string;
   readonly queuedAt: string;
@@ -380,9 +382,11 @@ function nonNegativeInteger(value: number | undefined, fallback: number): number
 }
 
 function priorityScore(candidate: NotificationCandidate): number {
-  const distance = Math.abs(candidate.currentPrice - resolveZoneMid(candidate));
+  const zoneMid = resolveZoneMid(candidate);
+  const rawDistance = Math.abs(candidate.currentPrice - zoneMid);
+  const percentDistance = zoneMid > 0 ? (rawDistance / zoneMid) * 100 : 0;
   const gradeBoost = candidate.gradeResult.grade === 'A+' ? 1000 : candidate.gradeResult.grade === 'A' ? 500 : 0;
-  return gradeBoost - distance;
+  return gradeBoost - (percentDistance * 20);
 }
 
 function resolveZoneMid(candidate: NotificationCandidate): number {

@@ -77,7 +77,7 @@ function mapCandidateToTimeframe(candidate: NotificationCandidate, candles: Stor
   if (candidate.poiType === 'OB') poi.formedAtIndex = nearestIndex(candidate.poiFormedTimestamp);
   else poi.middleCandleIndex = nearestIndex(candidate.poiFormedTimestamp);
   poi.relatedEvent = { ...poi.relatedEvent, breakCandleIndex: nearestIndex(poi.relatedEvent.breakTimestamp) };
-  return { ...candidate, poi, currentPrice: candles[candles.length - 1].close } as NotificationCandidate;
+  return { ...candidate, poi, currentPrice: candidate.currentPrice ?? candles[candles.length - 1].close } as NotificationCandidate;
 }
 
 export async function captureLightweightChartWithMetadata(

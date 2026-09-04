@@ -21,6 +21,8 @@ import { compareV1GradeWithV2Assessment, SetupAssessmentComparison } from '../sr
 import { DetectorResult, SetupAssessment } from '../src/setupAssessment';
 import { recordPipelineFilterTelemetry, recordPoiLifecycleTelemetry } from './telemetry';
 import { Symbol } from './universe';
+import { getPipSize } from '../src/assetMetrics';
+import { consolidateCandidates } from '../src/poiConsolidator';
 
 export interface NotificationCandidate {
   symbol: Symbol;
@@ -533,7 +535,7 @@ export function runPipeline(
     }
   }
 
-  return finish(candidates);
+  return finish(consolidateCandidates(candidates));
 }
 
 function latestCompletedCandle(candles: readonly Candle[]): Candle {
@@ -574,7 +576,7 @@ function averageTrueRangePips(
 }
 
 function pipSize(symbol: string): number {
-  return symbol.includes('JPY') ? 0.01 : 0.0001;
+  return getPipSize(symbol);
 }
 
 function recordGradeRejection(gradeResult: GradeResult, reject: (reason: string) => void): void {

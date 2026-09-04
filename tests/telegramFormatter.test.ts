@@ -1,4 +1,4 @@
-﻿import { formatNotificationMessage, formatTR } from '../server/telegramFormatter';
+import { formatNotificationMessage, formatTR } from '../server/telegramFormatter';
 import { buildRuntimeNotificationMessage } from '../server/notificationBuilder';
 import { runRuntimeExecutionPipeline } from '../server/runtimeExecutionPipeline';
 import { NotificationCandidate } from '../server/pipeline';
@@ -98,8 +98,8 @@ describe('Telegram Formatter', () => {
     expect(msg).toContain('Grade                 : A+ (9/9)');
     expect(msg).toContain('Giriş bölgesi         : 1.05300 - 1.05500');
     expect(msg).toContain('Anlık fiyat           : 1.05850');
-    expect(msg).toContain('Aksiyon               : Geri çekilmeyi bekle');
-    expect(msg).toContain('Onay                  : Fiyat giriş bölgesinde değil; önce geri çekilme, sonra 1 dakikalık manuel onay.');
+    expect(msg).toContain('Aksiyon               : Giriş bölgesine geri çekilmeyi (retest) bekle. Bölgeye dönmeden kesinlikle işlem yok.');
+    expect(msg).toContain('Onay                  : Fiyat giriş bölgesinde değil; önce geri çekilme (retest), sonra 1 dakikalık manuel onay.');
   });
 
   test('keeps the message concise and removes internal dumps', () => {
@@ -127,8 +127,8 @@ describe('Telegram Formatter', () => {
     const msg = buildRuntimeNotificationMessage(candidate, execution);
 
     expect(msg).toContain('SİNYAL ÖZETİ');
-    expect(msg).toContain('Aksiyon               : Geri çekilmeyi bekle');
-    expect(msg).toContain('Onay                  : Fiyat giriş bölgesinde değil; önce geri çekilme, sonra 1 dakikalık manuel onay.');
+    expect(msg).toContain('Parite                : EURUSD');
+    expect(msg).toContain('Giriş bölgesi         : 1.05300 - 1.05500');
     expect(msg).not.toContain('Version');
     expect(msg).not.toContain('Decision');
   });

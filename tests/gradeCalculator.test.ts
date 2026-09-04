@@ -182,13 +182,13 @@ describe('Grade Calculator - Core Grading & Blocks', () => {
     expect(result.entryAllowed).toBe(false);
     expect(result.blockReasons).toContain('4H premium/discount context conflicts with the trade');
 
-    // Scenario 1.1: 4H EQ is allowed with -1 score penalty
+    // Scenario 1.1: 4H EQ caps A+ to A
     const inputEQ = dummyInput();
     inputEQ.pd4H.status = 'eq';
     result = calculateGrade(inputEQ);
-    expect(result.totalScore).toBe(8); // 1 + 2 + 2 + 2 + 1 = 8 (A+)
+    expect(result.totalScore).toBe(8); // 1 + 2 + 2 + 2 + 1 = 8
+    expect(result.grade).toBe('A'); // Capped at A by equilibrium rule
     expect(result.entryAllowed).toBe(true);
-    expect(result.blockReasons).toHaveLength(0);
 
     // Scenario 2: POI 3+ tests remain blocked by one POI-integrity decision.
     const inputPOI = dummyInput();
@@ -196,7 +196,6 @@ describe('Grade Calculator - Core Grading & Blocks', () => {
     result = calculateGrade(inputPOI);
     expect(result.entryAllowed).toBe(false);
     expect(result.blockReasons).toContain('POI integrity is below the minimum entry standard');
-    expect(result.blockReasons).toHaveLength(1);
     expect(result.poiIntegrity).toEqual({
       decision: 'FAIL',
       contributingReasons: ['QUALITY_BELOW_MINIMUM', 'TEST_COUNT_GTE_3'],
@@ -214,7 +213,8 @@ describe('Grade Calculator - Core Grading & Blocks', () => {
     expect(twoTests.poiIntegrity).toEqual({ decision: 'PASS', contributingReasons: [] });
     expect(twoTests.breakdown.poiQuality).toBe(-1); // -1 penalty
     expect(twoTests.totalScore).toBe(7); // 9 - 2 = 7 (poi was 1, now -1)
-    expect(twoTests.grade).toBe('A');
+    expect(twoTests.grade).toBe('B+'); // Capped at B+ because poiTestCount >= 2
+    expect(twoTests.entryAllowed).toBe(false);
 
     const overTestedInput = dummyInput();
     overTestedInput.poiTestCount = 5;

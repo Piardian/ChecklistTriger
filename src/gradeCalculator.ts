@@ -201,15 +201,40 @@ export function calculateGrade(input: GradeInput): GradeResult {
     grade = 'C';
   }
 
-  const blockReasons: string[] = [];
   const expected4HBias = input.tradeDirection === 'long' ? 'bullish' : 'bearish';
+
+  // Tiered Grade A+ vs Grade A Calibration:
+  // 1. Grade A+ Requirements (Elite Pinnacle):
+  // Must have: 0 tests, güçlü displacement, 4H+1H full alignment, and no 4H equilibrium.
+  if (grade === 'A+') {
+    if (input.pd4H.status === 'eq' ||
+        input.displacementQuality15m?.quality !== 'güçlü' ||
+        input.poiTestCount > 0 ||
+        input.bias1H !== expected4HBias) {
+      grade = 'A';
+    }
+  }
+
+  // 2. Grade A Hard Caps (Quality Floor):
+  // - Weak displacement: Cap at B+ (no entry)
+  if (input.displacementQuality15m?.quality === 'zayıf' || input.displacementQuality15m?.quality === 'yok') {
+    if (grade === 'A+' || grade === 'A') grade = 'B+';
+  }
+  // - Over-tested POI (>= 2 tests): Cap at B+ (no entry)
+  if (input.poiTestCount >= 2) {
+    if (grade === 'A+' || grade === 'A') grade = 'B+';
+  }
+  // - 1H opposite in Model 2 continuation: Cap at B+
+  const is1HOpposite = (input.bias4H === 'bullish' && input.bias1H === 'bearish') ||
+                       (input.bias4H === 'bearish' && input.bias1H === 'bullish');
+  if (is1HOpposite && input.modelState.model === 'model2_continuation') {
+    if (grade === 'A+' || grade === 'A') grade = 'B+';
+  }
+
+  const blockReasons: string[] = [];
   if (input.bias4H !== expected4HBias) {
     blockReasons.push('4H bias is not directional or conflicts with the trade');
   }
-  const is1HOpposite = (input.bias4H === 'bullish' && input.bias1H === 'bearish') ||
-                       (input.bias4H === 'bearish' && input.bias1H === 'bullish');
-  // For Model 2 (continuation), 1H opposite is an invalid continuation.
-  // For Model 1 (reversal/pullback), 1H opposite is an expected pullback (-1 penalty already applied).
   if (is1HOpposite && input.modelState.model === 'model2_continuation') {
     blockReasons.push('1H bias is not aligned with 4H bias for continuation model');
   }
@@ -224,6 +249,9 @@ export function calculateGrade(input: GradeInput): GradeResult {
   if (input.displacementQuality15m === null || input.displacementQuality15m.gradePoints < 1) {
     blockReasons.push('15M displacement quality is insufficient');
   }
+  if (input.poiTestCount >= 2) {
+    blockReasons.push('POI is already tested multiple times; fresh POIs required for entry');
+  }
   if (input.modelState.model === 'none') {
     blockReasons.push('liquidity/model confirmation is missing');
   }
@@ -231,13 +259,13 @@ export function calculateGrade(input: GradeInput): GradeResult {
     blockReasons.push('POI integrity is below the minimum entry standard');
   }
 
-  // Category minimums check
+  // Category minimums check for entryAllowed
   const meetsCategoryMinimums =
     !is4HPDDirectlyOpposite &&
     input.bias4H === expected4HBias &&
     input.modelState.model !== 'none' &&
     (input.displacementQuality15m !== null && input.displacementQuality15m.gradePoints >= 1) &&
-    input.poiTestCount < 3 &&
+    input.poiTestCount <= 1 &&
     input.has15mEvent;
 
   const entryAllowed = blockReasons.length === 0 && (grade === 'A+' || grade === 'A') && meetsCategoryMinimums;

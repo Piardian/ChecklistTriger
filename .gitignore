@@ -34,3 +34,6 @@ jest-results*.json
 Thumbs.db
 .vscode/
 .idea/
+.aider*
+.codex*
+

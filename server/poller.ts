@@ -28,9 +28,11 @@ import { recordApprovedSignalEvidenceAsync, SignalOperationalEvidence } from './
 import type { SignalDeliveryQueue } from './signalDeliveryQueue';
 
 import { evaluateKillzoneFilter } from './killzone';
+import { SetupFamilyGuard } from './setupFamilyGuard';
 
 const signalIntelligenceSnapshotWriter = new FileSignalIntelligenceSnapshotWriter();
 const signalRepository = new InMemorySignalRepository();
+export const setupFamilyGuard = new SetupFamilyGuard();
 
 export interface PollAndProcessResult {
   readonly success: boolean;
@@ -97,6 +99,12 @@ export async function pollAndProcess(
               : [candidate.uniqueKey];
             if (!notifiedStore.reservePending(pendingKeys)) {
               console.log(`[Signal: ${signalId}] Candidate reservation skipped because it is already pending or notified.`);
+              continue;
+            }
+
+            const familyCheck = setupFamilyGuard.shouldAllow(candidate);
+            if (!familyCheck.allowed) {
+              console.log(`[Signal: ${signalId}] Suppressed by SetupFamilyGuard: ${familyCheck.reason}`);
               continue;
             }
 
@@ -276,6 +284,9 @@ export async function pollAndProcess(
             if (deliveryQueue) {
               const queuedAt = new Date().toISOString();
               const queued = deliveryQueue.enqueue(candidate, queuedAt);
+              if (queued.state === 'QUEUED' || queued.state === 'DISPATCHING' || queued.state === 'RATE_LIMIT_RETRY') {
+                setupFamilyGuard.recordNotification(candidate);
+              }
               pendingTransferredToQueue = queued.state === 'QUEUED' ||
                 queued.state === 'DISPATCHING' ||
                 queued.state === 'RATE_LIMIT_RETRY';
@@ -417,6 +428,7 @@ export async function pollAndProcess(
               continue;
             }
             markCandidateAsNotified(notifiedStore, candidate);
+            setupFamilyGuard.recordNotification(candidate);
             console.log(`[Signal: ${signalId}] Notification Success`);
             operationalState.healthStatus.telegram = 'OK';
 

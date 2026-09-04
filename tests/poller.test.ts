@@ -4,7 +4,7 @@ jest.mock('../server/telegramSender');
 jest.mock('../server/tvScreenshot');
 jest.mock('../server/tvChartCapture');
 
-import { pollAndProcess } from '../server/poller';
+import { pollAndProcess, setupFamilyGuard } from '../server/poller';
 import * as client from '../server/twelveDataClient';
 import * as pipelineModule from '../server/pipeline';
 import * as telegramSender from '../server/telegramSender';
@@ -29,6 +29,7 @@ describe('Poller', () => {
     }
     candleStore = new CandleStore(testDir);
     notifiedStore = new NotifiedStore(testDir);
+    setupFamilyGuard.clear();
 
     jest.resetAllMocks();
     jest.spyOn(killzone, 'evaluateKillzoneFilter').mockReturnValue({

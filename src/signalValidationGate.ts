@@ -1,5 +1,6 @@
 import { NotificationCandidate } from '../server/pipeline';
 import { RuntimeExecutionPipelineResult } from '../server/runtimeExecutionPipeline';
+import { getPipSize } from './assetMetrics';
 
 export const SIGNAL_VALIDATION_GATE_VERSION = 2 as const;
 
@@ -197,13 +198,7 @@ function distanceToZonePips(candidate: NotificationCandidate, low: number, high:
 }
 
 function pipSize(symbol: string): number {
-  if (symbol.includes('JPY')) return 0.01;
-  if (symbol === 'NAS100' || symbol === 'US100') return 1.0;
-  if (symbol.startsWith('XAU')) return 0.1;
-  if (symbol.startsWith('XAG')) return 0.01;
-  if (symbol.startsWith('BTC') || symbol.startsWith('ETH')) return 1.0;
-  if (symbol.startsWith('LTC')) return 0.1;
-  return 0.0001;
+  return getPipSize(symbol);
 }
 
 function directionMatchesTrade(tradeDirection: 'long' | 'short', direction: 'bullish' | 'bearish'): boolean {

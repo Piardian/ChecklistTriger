@@ -257,12 +257,12 @@ describe('Pipeline Orchestrator', () => {
     const mockDq = jest.spyOn(scorerModule, 'scoreDisplacementQuality').mockReturnValue({
       legDirection: 'bullish',
       bodyRatioScore: 1,
-      consecutiveScore: 0.5,
-      fvgScore: 0.5,
-      sizeScore: 0,
-      totalScore: 2,
-      quality: 'orta',
-      gradePoints: 1,
+      consecutiveScore: 1,
+      fvgScore: 1,
+      sizeScore: 1,
+      totalScore: 4,
+      quality: 'güçlü',
+      gradePoints: 2,
     });
 
     const res = runPipeline('GBPUSD', candleStore, notifiedStore);

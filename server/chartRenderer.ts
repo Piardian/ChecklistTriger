@@ -2,6 +2,7 @@ import { createCanvas } from 'canvas';
 import { StoredCandle, Symbol, Timeframe } from './candleStore';
 import { NotificationCandidate } from './pipeline';
 import { OrderBlock, FVG } from '../src/types';
+import { formatPrice } from '../src/assetMetrics';
 
 export function renderCandidateChart(
   candles: StoredCandle[],
@@ -23,15 +24,15 @@ export function renderCandidateChart(
     return canvas.toBuffer('image/png');
   }
 
-  const { symbol, tradeDirection, poiType, poi, gradeResult, poiFormedTimestamp, poiTestCount } = candidate;
+  const { symbol, tradeDirection, poiType, poi, gradeResult, poiFormedTimestamp, poiTestCount, currentPrice } = candidate;
 
   // Zone levels
   const zoneHigh = poiType === 'OB' ? (poi as OrderBlock).high : (poi as FVG).gapHigh;
   const zoneLow = poiType === 'OB' ? (poi as OrderBlock).low : (poi as FVG).gapLow;
 
   // Determine min and max price for scaling
-  let minPrice = Math.min(...candles.map(c => c.low), zoneLow);
-  let maxPrice = Math.max(...candles.map(c => c.high), zoneHigh);
+  let minPrice = Math.min(...candles.map(c => c.low), zoneLow, currentPrice ?? zoneLow);
+  let maxPrice = Math.max(...candles.map(c => c.high), zoneHigh, currentPrice ?? zoneHigh);
   const priceRange = maxPrice - minPrice;
   
   // Add 10% padding
@@ -75,7 +76,7 @@ export function renderCandidateChart(
     ctx.stroke();
 
     // Draw price text
-    ctx.fillText(priceVal.toFixed(5), marginLeft + chartWidth + 10, yVal + 4);
+    ctx.fillText(formatPrice(priceVal, symbol), marginLeft + chartWidth + 10, yVal + 4);
   }
 
   // Draw POI Box
@@ -89,7 +90,6 @@ export function renderCandidateChart(
       let testIndex = -1;
       for (let i = formedIndex + 1; i < candles.length; i++) {
         const c = candles[i];
-        // Retest checks if candle enters or touches the POI zone
         if (c.low <= zoneHigh && c.high >= zoneLow) {
           testIndex = i;
           break;
@@ -116,7 +116,7 @@ export function renderCandidateChart(
     // Label POI Box
     ctx.fillStyle = poiType === 'OB' ? '#3498db' : '#9b59b6';
     ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(poiType, boxStartX + 5, boxYHigh - 6);
+    ctx.fillText(`${poiType} (${formatPrice(zoneLow, symbol)} - ${formatPrice(zoneHigh, symbol)})`, boxStartX + 5, boxYHigh - 6);
   } else {
     console.warn(`[ChartRenderer] POI formed index matching timestamp ${poiFormedTimestamp} not found in chart candles. Box skipped.`);
   }
@@ -140,6 +140,23 @@ export function renderCandidateChart(
     ctx.fillText(poi.relatedEvent.type, breakX - 15, marginTop - 10);
   } else {
     console.warn(`[ChartRenderer] BOS/CHoCH break index matching timestamp ${poi.relatedEvent.breakTimestamp} not found in chart candles. Line skipped.`);
+  }
+
+  // Draw Current Price Line
+  if (currentPrice !== undefined && currentPrice > 0) {
+    const cpY = getY(currentPrice);
+    ctx.strokeStyle = '#ff9800';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(marginLeft, cpY);
+    ctx.lineTo(marginLeft + chartWidth, cpY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#ff9800';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(`ANLIK: ${formatPrice(currentPrice, symbol)}`, marginLeft + chartWidth + 5, cpY - 4);
   }
 
   // Draw Candlesticks
@@ -172,8 +189,26 @@ export function renderCandidateChart(
 
   // Draw Title text
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 20px sans-serif';
+  ctx.font = 'bold 18px sans-serif';
   ctx.fillText(`${symbol} — ${tradeDirection.toUpperCase()} — Grade ${gradeResult.grade}`, marginLeft, 40);
+
+  // Draw Action Decision Badge
+  const inZone = currentPrice >= zoneLow && currentPrice <= zoneHigh;
+  const badgeText = inZone
+    ? 'AKTİF BÖLGEDE — 1M ONAY BEKLE'
+    : 'BEKLEMEDE — BÖLGEYE RETEST BEKLE';
+  const badgeBg = inZone ? '#2e7d32' : '#1565c0';
+
+  ctx.font = 'bold 12px sans-serif';
+  const badgeWidth = ctx.measureText(badgeText).width + 20;
+  const badgeX = marginLeft + chartWidth - badgeWidth;
+  const badgeY = 22;
+
+  ctx.fillStyle = badgeBg;
+  ctx.fillRect(badgeX, badgeY, badgeWidth, 24);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(badgeText, badgeX + 10, badgeY + 16);
 
   return canvas.toBuffer('image/png');
 }
