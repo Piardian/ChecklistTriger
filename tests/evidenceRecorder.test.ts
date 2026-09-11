@@ -73,7 +73,7 @@ describe('Signal Evidence Recorder', () => {
       exitTimestamp: 3000,
       exitReason: 'manual validation fixture',
     }, store);
-    await new Promise(resolve => setTimeout(resolve, 20));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const signalPath = path.join(testDir, 'signals', 'signal-evidence.jsonl');
     const outcomePath = path.join(testDir, 'outcomes', 'outcome-evidence.jsonl');

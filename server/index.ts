@@ -89,8 +89,10 @@ async function initializeBackgroundServices(
   for (const symbol of symbols) {
     for (const timeframe of timeframes) {
       const existing = candleStore.getCandles(symbol, timeframe);
-      if (existing.length >= 50 && timeframe !== '15m') {
-        console.log(`[Startup] ${symbol} (${timeframe}) has ${existing.length} cached candles, using cache.`);
+      const threshold = timeframe === '15m' ? 13 * 60 * 1000 : (timeframe === '1h' ? 55 * 60 * 1000 : 230 * 60 * 1000);
+      const isFresh = candleStore.isFresh(symbol, timeframe, threshold);
+      if (existing.length >= 50 && (timeframe !== '15m' || isFresh)) {
+        console.log(`[Startup] ${symbol} (${timeframe}) has ${existing.length} cached candles (fresh: ${isFresh}), using cache.`);
         continue;
       }
       console.log(`Polling ${symbol} (${timeframe})...`);
@@ -123,7 +125,8 @@ function scheduleNextAlignedPoll(
 ): void {
   const now = Date.now();
   const fifteenMinutesMs = 15 * 60 * 1000;
-  const nextTargetMs = Math.ceil((now + 5000) / fifteenMinutesMs) * fifteenMinutesMs + 5000;
+  const pollOffsetMs = environmentInteger('POLL_ALIGN_OFFSET_MS', 5000);
+  const nextTargetMs = Math.ceil((now + pollOffsetMs) / fifteenMinutesMs) * fifteenMinutesMs + pollOffsetMs;
   const delayMs = Math.max(1000, nextTargetMs - now);
 
   const nextDate = new Date(nextTargetMs).toISOString();
@@ -175,20 +178,25 @@ function runTrackedPoll(
   const existing = activePolls.get(key);
   if (existing) return existing;
 
-  const running = pollAndProcess(symbol, timeframe, candleStore, notifiedStore, deliveryQueue)
-    .catch(error => ({
-      success: false,
-      fetchedCount: 0,
-      failureReason: error instanceof Error ? error.message : String(error),
-    }))
-    .then(result => {
+  const running = (async (): Promise<PollAndProcessResult> => {
+    try {
+      const result = await pollAndProcess(symbol, timeframe, candleStore, notifiedStore, deliveryQueue);
       latestPollResults.set(key, result);
       if (initialPollingComplete) publishPollReadiness();
       return result;
-    })
-    .finally(() => {
-      activePolls.delete(key);
-    });
+    } catch (error) {
+      const result: PollAndProcessResult = {
+        success: false,
+        fetchedCount: 0,
+        failureReason: error instanceof Error ? error.message : String(error),
+      };
+      latestPollResults.set(key, result);
+      if (initialPollingComplete) publishPollReadiness();
+      return result;
+    }
+  })().finally(() => {
+    activePolls.delete(key);
+  });
 
   activePolls.set(key, running);
   return running;
@@ -257,6 +265,13 @@ function installShutdownHandlers(): void {
   };
   process.once('SIGINT', () => shutdown('SIGINT'));
   process.once('SIGTERM', () => shutdown('SIGTERM'));
+
+  process.on('unhandledRejection', reason => {
+    console.error('[Process] Unhandled Rejection:', reason);
+  });
+  process.on('uncaughtException', error => {
+    console.error('[Process] Uncaught Exception:', error);
+  });
 }
 
 function environmentInteger(name: string, fallback: number): number {

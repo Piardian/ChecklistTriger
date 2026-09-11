@@ -660,7 +660,7 @@ Bu bölüm, sistemin erken döneminde üretilen ve loglardan çıkarılan işlem
 - **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
 - **Bot Puanı:** Grade A (6/9)
 - **Giriş Bölgesi:** 0.58895 - 0.58942 | **Anlık Fiyat:** 0.58564 | **Stop:** 0.58942 üstü
-- **Durum:** 🔄 **AKTİF / İŞLEMDE** — Fiyat 0.58564 dip seviyesinden yukarı geri çekilme (pullback) yaparak 0.58895 - 0.58942 OB giriş bölgesine re-test verdi ve kullanıcı tarafından işleme girildi; anlık olarak pozisyon takip ediliyor.
+- **Durum:** ✅ **TP (+2,000 $ / Hedef Likidite Alındı)** — Fiyat 0.58895 - 0.58942 OB giriş bölgesine re-test vererek işlemi tetikledikten sonra 4H+1H düşüş trendi doğrultusunda alt hedeflere akarak TP oldu (+2,000 $ kâr realize edildi).
 - **Gözlem:**
   - 2 Eylül sabahı 0.5890 tepe seviyesinden aşağı yeni bir 15M BOS kırılımı oluştu ve tabanda 0.58895 - 0.58942 aralığında 15M Bearish OB tespit edildi.
   - Sinyal 33.1 pip uzaktayken üretildi; ardından fiyat düzeltmesini tamamlayıp 0.58895 giriş bölgesine temas ederek işlemi aktif hale getirdi.
@@ -668,8 +668,8 @@ Bu bölüm, sistemin erken döneminde üretilen ve loglardan çıkarılan işlem
   - **HTF Trend Uyumu:** `4H: Düşüş (Aşağı) | 1H: Düşüş (Aşağı)` — Tam çift zaman dilimi uyumu.
   - **P/D Durumu:** `4H: Denge | 1H: Pahalı (Premium) | 15M: Pahalı (Premium)`.
   - **Bölge Türü:** 15M Bearish Order Block.
-- **Takip Notu:**
-  - 🎯 İşlem bölge içi aktif durumdadır; 4H+1H düşüş trendi doğrultusunda 0.5856 alt dip hedefine doğru satıcı momentumu takip edilmektedir.
+- **Sonuç & Kâr Realizasyonu:**
+  - 🎯 Kurumsal düşüş yönü kusursuz çalıştı. Hedef likidite bölgesinde işlem başarıyla kapatıldı (+2,000 $).
 
 ### 36. [2026-09-03 22:04 TSİ / 19:04 UTC] — EURCHF (15M OB - AL)
 
@@ -737,42 +737,219 @@ Bu bölüm, sistemin erken döneminde üretilen ve loglardan çıkarılan işlem
   - Fiyat taze kırılım bölgesine re-test için beklemededir.
 - **SMC Bağlamı:**
   - **HTF Trend Uyumu:** `4H: Yukarı | 1H: Yukarı` — Tam yükseliş trendi uyumu.
-  - **P/D Durumu:** `4H: Ucuz | 1H: Pahalı | 15M: Pahalı`.
-  - **Bölge Türü:** 15M Taze Bullish Order Block.
-- **Takip Notu:**
-  - 🎯 Fiyatın 713.48 OB tavanına geri çekilip 1M zaman diliminde alıcı teyidi vermesi beklenmektedir.
+  ### 41. [2026-09-04 05:15 TSİ / 02:15 UTC] — CADCHF (15M OB - AL)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (6/9)
+- **Giriş Bölgesi:** 0.58379 - 0.58409 | **Anlık Fiyat:** 0.58568 | **Stop:** 0.58379 altı
+- **Durum:** ⏳ **BEKLEMEDE (Giriş Bölgesine Geri Çekilme / Re-test Bekleniyor)** — Sinyal anında fiyat bölgenin 15.9 pip üstündeydi. Fiyat 0.5856 seviyesinde yatay seyrediyor; 0.58379 - 0.58409 OB bölgesine re-test ve 1M onayı bekleniyor.
+- **Gözlem:**
+  - 2 Eylül sabahı 10:00'da 0.5838 seviyesinden yukarı doğru 15M CHoCH kırılımı gerçekleşti ve tabanda 0.58379 - 0.58409 aralığında 15M Bullish OB oluştu (2 gün öncesine ait).
+  - Sinyal 4 Eylül 05:15'te fiyat 0.58568 seviyesindeyken üretildi.
+  - Fiyat henüz bölgeye geri çekilmediği için işlem beklemede tutulmaktadır.
+### 42. [2026-09-04 16:01 TSİ / 13:01 UTC] — GBPUSD (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (6/9)
+- **Giriş Bölgesi:** 1.35281 - 1.35330 | **Anlık Fiyat:** 1.34990 | **Stop:** 1.35330 üstü
+- **Durum:** ❌ **STOP / GEÇERSİZ (-0.5R / -%0.5 Risk)** — Operatör tarafından Fib 0.5 seviyesine %0.5 risk ile limit emir atıldı. Fiyat geri çekilmede limit emri tetikledikten sonra 1.35330 stop seviyesini yukarı kırarak stop oldu.
+- **Gözlem:**
+  - 4 Eylül öğle saatlerinde (12:30 mumu) 1.3530 seviyesinden düşüş mumuyla 15M BOS kırılımı oluştu ve tabanda 1.35281 - 1.35330 aralığında 15M Bearish OB oluştu.
+  - Sinyal 16:01'de üretildi, operatör Fib 0.5 seviyesine limit emir kurdu. Fiyat bölgeyi delip geçerek stop oldu.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi düşüş uyumu vardı.
+  - **P/D Durumu:** `4H: Pahalı | 1H: Denge | 15M: Ucuz`.
+  - **Bölge Türü:** 15M Bearish Order Block.
+- **Hata veya Zayıflık / Kritik Ders:**
+  - 🎯 **Limit Emir Tuzağı & 1M Onay Zorunluluğu:** Fiyat 15M OB bölgesine geri çekildiğinde 1M üzerinde kurumsal onay (CHoCH / Displacement) beklenmeden salt Fib 0.5'e limit emir atılması, sert gelen alıcı momentumuna karşı savunmasız kalmaya neden oldu.
+  - 🎯 **Pozitif Yön:** Operatörün tam risk yerine %0.50 defansif risk alması zararı yarı yarıya sınırlandırmıştır.
+### 43. [2026-09-04 19:16 TSİ / 16:16 UTC] — CHFJPY (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (6/9)
+- **Giriş Bölgesi:** 193.336 - 193.458 | **Anlık Fiyat:** 192.852 | **Stop:** 193.458 üstü
+- **Durum:** ⏳ **BEKLEMEDE (Giriş Bölgesine Geri Çekilme / Re-test Bekleniyor)** — Sinyal anında fiyat bölgenin 48.4 point (48.4 pip) altındaydı. Fiyat 191.40 dip seviyesinden 192.85'e toparlandı; 193.336 - 193.458 OB bölgesine re-test ve 1M onayı bekleniyor.
+- **Gözlem:**
+  - 4 Eylül sabahı 193.45 seviyesinden aşağı yeni bir 15M CHoCH kırılımı gerçekleşti ve tabanda 193.336 - 193.458 aralığında 15M Bearish OB oluştu.
+  - Sinyal 19:16'da fiyat 192.852 seviyesindeyken üretildi.
+  - Fiyat bölgeye geri çekilme aşamasındadır.
+### 44. [2026-09-04 20:01 TSİ / 17:01 UTC] — CHFJPY (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (6/9)
+- **Giriş Bölgesi:** 195.434 - 195.574 | **Anlık Fiyat:** 192.884 | **Stop:** 195.574 üstü
+- **Durum:** ⏳ **BEKLEMEDE (Bayat / Hayalet POI — Fiyat Tam 255 Pip Uzakta)** — Sinyal anında fiyat bölgenin tam **255.0 point (255.0 pip)** altındaydı. Fiyat 191.40 dibinden 192.88'e toparlanmışken 2 gün önceki bu eski tepeye dönmesi beklenmektedir.
+- **Gözlem:**
+  - 3 Eylül sabahı 195.50 seviyesindeki eski bir 15M Bearish OB seviyesidir (40+ saat öncesine ait).
+  - Fiyat 195.50'den 191.40'a kadar 400+ pip çöktükten sonra sinyal motoru bu eski seviyeyi tekrar tespit ederek sinyal üretmiştir.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı`
+  ### 45. [2026-09-04 20:15 TSİ / 17:15 UTC] — CHFJPY (15M OB - SAT) [Tekrar / Spam]
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (7/9)
+- **Giriş Bölgesi:** 195.412 - 195.508 | **Anlık Fiyat:** 192.807 | **Stop:** 195.508 üstü
+- **Durum:** ⏳ **BEKLEMEDE (Bayat / Hayalet POI — Fiyat Tam 260 Pip Uzakta)** — 20:01'deki 44. sinyalin 14 dakika sonra hafif revize edilmiş haliyle yeniden fırlatılmış tekrar sinyalidir. Fiyat bölgenin tam **260.4 point (260 pip)** altındadır.
+- **Gözlem:**
+  - 3 Eylül sabahı 195.50 seviyesindeki eski OB kutusunun 20:01 sinyalinden hemen sonra ikinci kez tetiklenmesidir.
+  - Sinyal 20:15'te fiyat 192.807 seviyesindeyken üretilmiştir.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı`
+  - **P/D Durumu:** `4H: Denge | 1H: Pahalı | 15M: Pahalı`.
+  - **Bölge Türü:** 15M Bayat Bearish Order Block (Spam Bildirim).
+### 46. [2026-09-04 23:45 TSİ / 20:45 UTC] — USDJPY (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (7/9)
+- **Giriş Bölgesi:** 157.677 - 157.806 | **Anlık Fiyat:** 156.283 | **Stop:** 157.806 üstü
+- **Durum:** ⏳ **BEKLEMEDE (Bayat / Hayalet POI — Fiyat 139.4 Pip Uzakta)** — Sinyal anında fiyat bölgenin tam **139.4 point (139.4 pip)** altındaydı. Fiyat 155.20 dibinden 156.28'e toparlanmışken 2 gün önceki 157.80 tepesine dönmesi beklenmektedir.
+- **Gözlem:**
+  - 3 Eylül sabahı 157.80 seviyesindeki 15M Bearish OB kırılım tabanıdır (40+ saat öncesine ait).
+  - Sinyal 4 Eylül 23:45'te fiyat 156.283 seviyesindeyken üretilmiştir.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi düşüş trendi.
+  - **P/D Durumu:** `4H: Pahalı | 1H: Pahalı | 15M: Pahalı`.
+  - **Bölge Türü:** 15M Bayat Bearish Order Block.
+- **Hata veya Zayıflık (Bot Açığı / SMC Otopsisi):**
+  1. **Aşırı Mesafe Açığı (139.4 Pip):** 15M intra-day için 140 piplik geri çekilme bekleme sinyalleri elenmelidir.
+  2. **POI Yaş Sınırı:** 24 saati geçmiş seviyeler otomatik olarak sistemden kaldırılmalıdır.
 
+### 47. [2026-09-10 TSİ] — LTCUSD (15M OB - AL)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (6/9)
+- **Giriş Bölgesi:** 55.14 - 55.49 | **Anlık Fiyat:** 55.50 | **Stop:** 55.14 altı
+- **Durum:** ❌ **PAS / İPTAL (Mitigasyon Tükenmiş / Hedef Alınmış / Bayat Kurulum)** — Kutu ve giriş bölgesi fiyattan önce 2 tam döngü yaşayıp 55.80 EQH hedefine ulaşmıştı. Grafik üzerinde anlık fiyat (55.50) ile giriş tavanı (55.49) neredeyse eşit olduğu için etiket çakışması yaşandı. İşlem alınmadı.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Yukarı | 1H: Denge`
+  - **Bölge Türü:** 15M Bullish Order Block (Tükenmiş/Eski).
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** [C] Kutuya taze bir yaklaşım yok (Döngü tamamlanmış)
+  - **Soru 2 (1M Formasyonu):** [C] Delip geçti / Onay yok (Eski hareket)
+  - **Soru 3 (Giriş Kararı):** [C] Girmedim (Pas)
+  - **Soru 4 (Sonuç):** [D] İşlem alınmadı (Korundu)
+  - **Soru 5 (Stop/İptal Nedeni):** [B] Hedefine gitmiş / Mitigasyon bitmiş
 
+### 48. [2026-09-10 TSİ] — USDJPY (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (7/9)
+- **Giriş Bölgesi:** 153.821 - 153.912 | **Anlık Fiyat:** 153.586 | **Stop:** 153.912 üstü
+- **Durum:** 🔄 **AKTİF / İŞLEMDE** — Fiyat 153.821 - 153.912 OB kutusuna retest verdi ve operatör tarafından işleme girildi. Pozisyon aktif olarak takip ediliyor.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi güçlü düşüş trendi.
+  - **P/D Durumu:** `4H: Pahalı | 1H: Ucuz | 15M: Pahalı`.
+  - **Likidite Mıknatısı:** EQL (3 dip @ 153.0949, 49 pip aşağıda açık likidite havuzu).
+  - **Karşı Engel:** 28.1 pip aşağıda 15M Bullish OB (`153.3767 — 153.5402`). Fiyatın 153.30 bölgesinden sekip yukarı tepki vermesi bu karşı engelin çalıştığını doğrulamaktadır.
+- **Kritik SMC Notu:** Sinyal 42 GBPUSD tecrübesi ışığında körü körüne limit emir atılmamış, disiplinli bir şekilde fiyatın kutuya gelişi ve 1M onayı beklenmektedir.
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** [B] Agresif / haber mumuyla daldı
+  - **Soru 2 (1M Formasyonu):** [A] 1M CHoCH kırılımı (dönüş yapısı) verdi
+  - **Soru 3 (Giriş Kararı):** [Kusursuz SMC Uygulaması] 1M CHoCH mumu kapandıktan sonra Fib EQ (0.50) seviyesine limit emir atıldı ve geri çekilmede dolduruldu
+  - **Soru 4 (Sonuç):** 🔄 İşlemde / Pozisyon taşınıyor
+  - **Soru 5 (Stop/İptal Nedeni):** ⏳ Pozisyon açık (Ana Hedef: 153.09 EQL likidite mıknatısı)
 
+### 49. [2026-09-10 11:45 TSİ] — GBPCHF (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (8/9) — Çok Yüksek Kalite
+- **Giriş Bölgesi:** 1.09913 - 1.09958 | **Anlık Fiyat:** 1.09832 | **Stop:** 1.09958 üstü
+- **Durum:** ❌ **STOP** — Fiyat 1.09913 - 1.09958 15M OB kutusuna ulaştıktan sonra 1.09958 stop seviyesini yukarı kırarak stop oldu.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi güçlü düşüş trendi.
+  - **P/D Durumu:** `4H: Pahalı | 1H: Pahalı | 15M: Pahalı` — Tüm zaman dilimlerinde Premium (Pahalı) bölge; kurumsal satış için ideal konfigürasyon.
+  - **Kutu Genişliği:** 4.5 pip (`1.09913 - 1.09958`) — Oldukça dar ve yüksek R/R sunan bir POI alanı.
+  - **Likidite Mıknatısı:** EQL (6 eşit dip @ 1.0969, 14.4 pip aşağıda açık Sell-Side Liquidity havuzu).
+  - **Karşı Engel:** 17.1 pip aşağıda 15M Bullish OB (`1.0969 — 1.0974`). Likidite mıknatısı ile karşı alıcı bloğu aynı seviyede kümelenmiştir (TP / Kâr Alma bölgesi).
+- **Kritik SMC Notu:** 1M grafiğinde 06:40'tan bu yana kesintisiz bir yükseliş trendi görülmektedir. 4.5 piplik dar kutu alıcı baskısını taşıyamamıştır.
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** ⏳ [Bekleniyor]
+  - **Soru 2 (1M Formasyonu):** ⏳ [Bekleniyor]
+  - **Soru 3 (Giriş Kararı):** ⏳ [Bekleniyor]
+  - **Soru 4 (Sonuç):** [B] Stop (-R)
+  - **Soru 5 (Stop/İptal Nedeni):** [A] Kutu tutmadı / delip geçti (Detay bekleniyor)
 
+### 50. [2026-09-10 14:45 TSİ] — XAUUSD (15M FVG - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (7/9)
+- **Giriş Bölgesi:** 4416.64 - 4423.52 | **Anlık Fiyat:** 4385.84 | **Stop:** 4423.52 üstü
+- **Durum:** ⏳ **BEKLEMEDE (Giriş Bölgesine Geri Çekilme & 1M Onayı Bekleniyor)** — Operatör notu: *"10 eylül 14.45 işlemi, bekliyoruz"*. Fiyat sinyal anında kutunun 30.80 USD (308 pip) altındaydı (4385.84). 10 Eylül sabahı 4430'dan sert düşüşle oluşan taze 15M FVG boşluğuna (4416.64 - 4423.52) geri çekilme ve 1M'de teyit aranmaktadır.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi güçlü düşüş trendi.
+  - **P/D Durumu:** `4H: Pahalı | 1H: Ucuz | 15M: Denge`.
+  - **Bölge Türü:** 15M Bearish FVG (Taze dengesizlik alanı).
+  - **Likidite Mıknatısı:** EQL (8 eşit dip @ 4368.72, sinyal anında 17.1 USD / 171 pip aşağıda açık SSL likidite havuzu).
+- **Kritik SMC Uyarısı & Tuzağı:**
+  - **Mesafe vs. Hedef Çelişkisi:** Fiyat sinyal anında giriş kutusuna $30.80 uzaktayken, ana hedef olan 4368.72 EQL mıknatısına sadece ~$17 (sinyal öncesi dip 4372'ye ise $3.3) mesafedeydi.
+  - Fiyat giriş kutusuna dönmeden önce 4368.72 seviyesindeki 8'li eşit dipleri süpürürse, düşüş senaryosunun yakıtı tükenmiş olur ve oradan yukarı sert bir kurumsal dönüş (reversal) gelebilir. Bu durumda 4416 FVG kutusu satıcılığını yitirir ve kurulum geçersiz (PAS) sayılmalıdır.
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** ⏳ [C] Henüz kutuya ulaşmadı (30.8 USD uzakta, dip konsolidasyonu)
+  - **Soru 2 (1M Formasyonu):** ⏳ Kutuya temas bekleniyor (Onay aşaması henüz gelmedi)
+  - **Soru 3 (Giriş Kararı):** ⏳ [C] Girmedim (1M onayı bekleniyor, disiplinli bekleme)
+  - **Soru 4 (Sonuç):** ⏳ Beklemede (Aktif takip ediliyor)
+  - **Soru 5 (Stop/İptal Nedeni):** ⏳ İşlem henüz tetiklenmedi
 
+### 51. [2026-09-10 20:15 TSİ] — ETHUSD (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 3 Ekran Görüntüsü (1H HTF, 15M Kurulum, 1M Giriş)
+- **Bot Puanı:** Grade A (7/9)
+- **Giriş Bölgesi:** 2475.29 - 2484.76 | **Anlık Fiyat:** 2468.39 | **Stop:** 2484.76 üstü
+- **Durum:** ❌ **STOP** — Fiyat 2475.29 - 2484.76 15M Bearish OB kutusuna girdikten sonra satıcı tepkisi bulamayarak 2484.76 stop seviyesini yukarı kırıp stop oldu.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı`
+  - **P/D Durumu:** `4H: Pahalı | 1H: Pahalı | 15M: Pahalı`
+  - **Bölge Türü:** 15M Bearish Order Block (9.47 USD genişliğinde).
+  - **Likidite Mıknatısı:** EQL (3 dip @ 2379.90, 88.5 pip aşağıda).
+  - **Karşı Engel:** 83.8 pip aşağıda 15M Bullish OB (`2384.69 — 2391.53`).
+- **SMC Otopsisi & Hata Nedeni:**
+  - 🎯 **V-Şeklinde Agresif Toparlanma & Limit Emir Tuzağı:** Fiyat 2405 dip seviyesine kadar sert çakıldıktan sonra hiçbir dinlenme yapmadan 70+ dolarlık dik bir V-rallisiyle kutuya daldı. 1M üzerinde kurumsal satıcı onayı (CHoCH / Sweep) beklenmeden kutuya limit emir atılması, sert gelen boğa momentumu karşısında pozisyonun doğrudan stop olmasına yol açtı.
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** [B] Agresif ralli mumu (V-şeklinde 2405 dibinden dönüş)
+  - **Soru 2 (1M Formasyonu):** [C] Delip geçti (1M onayı vermedi)
+  - **Soru 3 (Giriş Kararı):** [C] Kutuya Limit Emir atıldı (1M onayı beklenmedi)
+  - **Soru 4 (Sonuç):** [B] Stop (-R)
+  - **Soru 5 (Stop/İptal Nedeni):** [A] Kutu tutmadı / delip geçti (Limit emir tuzağı)
 
+### 52. [2026-09-11 TSİ] — NZDUSD (15M OB - SAT)
 
+- **Kaynak:** Telegram Sinyali & 2 Ekran Görüntüsü (1H HTF, 15M Kurulum)
+- **Bot Puanı:** Grade A (6/9)
+- **Giriş Bölgesi:** 0.58333 - 0.58364 | **Anlık Fiyat:** 0.58280 | **Stop:** 0.58364 üstü
+- **Durum:** 🔄 **AKTİF / İŞLEMDE** — Operatör notu: *"11 eylül işlemi işlemde"*. Fiyat 10 Eylül'deki 0.5795 dip seviyesinden toparlanarak 0.58333 - 0.58364 aralığındaki 15M Bearish OB kutusuna retest verdi ve operatör tarafından işleme girildi. Pozisyon aktif olarak takip ediliyor.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi net düşüş trendi.
+  - **P/D Durumu:** `4H: Denge | 1H: Denge | 15M: Pahalı`.
+  - **Kutu Genişliği:** Sadece 3.1 pip (`0.58333 — 0.58364`) — Aşırı dar stoplu, çok yüksek R/R potansiyelli POI kutusu.
+  - **Likidite Mıknatısı:** EQL (2 dip @ 0.5797, 30.9 pip aşağıda açık Sell-Side Liquidity havuzu).
+  - **Karşı Engel:** 24.1 pip aşağıda 15M Bullish OB (`0.5806 — 0.5809`).
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** ⏳ [Kademeli düzeltme]
+  - **Soru 2 (1M Formasyonu):** ⏳ [Detay bekleniyor]
+  - **Soru 3 (Giriş Kararı):** ⏳ [Detay bekleniyor]
+  - **Soru 4 (Sonuç):** 🔄 İşlemde / Pozisyon taşınıyor
+  - **Soru 5 (Stop/İptal Nedeni):** ⏳ Pozisyon açık (Hedef: 0.5797 EQL likiditesi)
 
+---
 
+## 📋 STANDART 1M BENCHMARK DOĞRULAMA ANKETİ (HAFTALIK DEĞERLENDİRME ŞABLONU)
 
+Her yeni canlı sinyal hafta sonu incelenirken aşağıdaki 5 standart soru üzerinden kodlanacaktır:
+```markdown
+### [SİNYAL NO] — [SEMBOL] ([YÖN] - [GRADE])
+- **Soru 1 (Kutuya Yaklaşım):** [A] Sakin düzeltme | [B] Agresif haber mumu | [C] Kutuya ulaşmadı
+- **Soru 2 (1M Formasyonu):** [A] 1M CHoCH/BOS kırılımı | [B] Sadece iğne (Wick Sweep) | [C] Delip geçti (Onay yok)
+- **Soru 3 (Giriş Kararı):** [A] 1M FVG/OB retesti | [B] Market emri | [C] Girmedim (Pas)
+- **Soru 4 (Sonuç):** [A] TP (+R) | [B] Stop (-R) | [C] Kâr gördü ama BE/Stop | [D] İşlem alınmadı (Korundu)
+- **Soru 5 (Stop/İptal Nedeni):** [A] Kutu tutmadı | [B] Karşı engelden döndü | [C] Haber mumu patlattı | [D] Yok
+```
 
+---
 
+## 🧲 YENİ 15M/1H ANALİTİK MOTORLARI (V2.1)
 
-
-
-
-
-
-
-
-
-
-
-
+1. **Likidite Mıknatısı (EQH/EQL - Target Magnet):**
+   - Fiyatın hedef yönünde bekleyen perakende stop yığınları (Eşit Tepeler / Eşit Dipler) tespit edilir.
+   - Mıknatıs tespit edildiğinde sinyale +1 güven puanı verilir ve bildirimde hedefin yakıtı olarak gösterilir.
+2. **Hedef Yolunda Karşı Engel (Opposing POI Obstacle):**
+   - 2R hedefi öncesinde (özellikle $\le 15$ pip mesafede) taze bir karşı OB veya FVG varsa sinyal uyarılır ve Grade `B+` seviyesine kilitlenerek gereksiz riskler engellenir.
