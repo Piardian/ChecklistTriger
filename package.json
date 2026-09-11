@@ -1,12 +1,14 @@
 {
-  "name": "swing-bos-core",
+  "name": "checklist-trigger",
   "version": "1.0.0",
-  "description": "Swing Detection and BOS/CHoCH Core Engine",
+  "description": "Institutional Smart Money Concepts (SMC) market structure analysis & event-driven alerting engine",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
     "start": "node dist/server/index.js",
     "test": "jest",
+    "test:unit": "jest",
+    "typecheck": "tsc --noEmit",
     "test:notify": "ts-node server/testNotify.ts",
     "demo:preview": "ts-node server/demoPreview.ts",
     "nas100:visualization": "ts-node server/nas100Visualization.ts"
