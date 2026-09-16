@@ -12,6 +12,7 @@ export type LearnedPatternType =
 
 export type ConfidenceLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 export type ConfidenceFactorLevel = ConfidenceLevel | 'UNKNOWN';
+export type LearningEvidenceProvenance = 'HISTORICAL' | 'SYNTHETIC_RUNTIME';
 
 export interface ConfidenceFactors {
   sample: ConfidenceLevel;
@@ -29,6 +30,8 @@ export interface LearnedPattern {
   coverage: number;
   confidence: ConfidenceLevel;
   confidenceFactors: ConfidenceFactors;
+  /** Provenance is optional for backwards compatibility; omitted means historical. */
+  provenance?: LearningEvidenceProvenance;
   comparisonEvidence: ComparisonEvidence;
   evidence: {
     observationId: string;
@@ -60,4 +63,3 @@ export interface LearnedPattern {
     segmentedBenchmarkVersion: number;
   };
 }
-
