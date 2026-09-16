@@ -10,6 +10,7 @@ import { OverlaySimplificationResult } from '../server/overlaySimplifier';
 import type { CommunicationDecisionLog, CommunicationMessage, CommunicationMessageQualityValidation } from './communicationModel';
 import type { OperationalErrorSummary, OperationalHealthSnapshot, OperationalRetrySummary, PipelineTimelineEntry } from '../server/telemetry';
 import type { GovernanceEvidenceSummary } from './governanceFramework';
+import type { SignalQualityResult } from './signalQualityEngine';
 
 export const SIGNAL_EVIDENCE_SCHEMA_VERSION = 1 as const;
 export const SIGNAL_EVIDENCE_ENGINE_VERSION = 1 as const;
@@ -31,14 +32,8 @@ export interface SmartScreenshotPlanEvidence {
   readonly focusIndex: number;
   readonly anchorIndices: readonly number[];
   readonly visibleBars: number;
-  readonly visibleRange: {
-    readonly from: number;
-    readonly to: number;
-  };
-  readonly padding: {
-    readonly leftBars: number;
-    readonly rightBars: number;
-  };
+  readonly visibleRange: { readonly from: number; readonly to: number };
+  readonly padding: { readonly leftBars: number; readonly rightBars: number };
   readonly reasons: readonly string[];
   readonly warnings: readonly string[];
 }
@@ -136,6 +131,8 @@ export interface SignalEvidenceRecord {
     readonly breakdown: GradeResult['breakdown'];
     readonly blockReasons: readonly string[];
   };
+  /** Full quality snapshot retained for historical learning segmentation. */
+  readonly signalQuality?: SignalQualityResult;
   readonly setupAssessmentShadow?: {
     readonly version: SetupAssessment['version'];
     readonly grade: SetupAssessment['grade'];
