@@ -1,6 +1,7 @@
 import {
   ConfidenceFactors,
   ConfidenceLevel,
+  ConfidenceMethod,
 } from './learningPattern';
 
 export interface ConfidenceInput {
@@ -8,8 +9,11 @@ export interface ConfidenceInput {
   coverage: number;
 }
 
+export const CONFIDENCE_METHOD: ConfidenceMethod = 'HEURISTIC_SAMPLE_COVERAGE';
+
 export function calculateConfidence(input: ConfidenceInput): {
   confidence: ConfidenceLevel;
+  confidenceMethod: ConfidenceMethod;
   confidenceFactors: ConfidenceFactors;
 } {
   const sample = scoreSample(input.sampleSize);
@@ -18,6 +22,7 @@ export function calculateConfidence(input: ConfidenceInput): {
 
   return {
     confidence: minConfidence(sample, coverage),
+    confidenceMethod: CONFIDENCE_METHOD,
     confidenceFactors: {
       sample,
       coverage,
@@ -42,4 +47,3 @@ function minConfidence(a: ConfidenceLevel, b: ConfidenceLevel): ConfidenceLevel 
   const order: Record<ConfidenceLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
   return order[a] <= order[b] ? a : b;
 }
-
