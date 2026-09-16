@@ -23,6 +23,7 @@ import { SignalLifecycleState } from '../src/signalLifecycle';
 import { SignalOutcome, createWaitingEntryOutcome } from '../src/signalOutcome';
 import { SignalBenchmark, createPendingSignalBenchmark } from '../src/signalBenchmark';
 import { NoopSignalRepository, SignalRepository } from '../src/signalRepository';
+import { defaultMarketDataOutcomeTracker } from '../src/signalOutcomeTracker';
 import { NotificationCandidate } from './pipeline';
 
 export interface RuntimeExecutionPipelineResult {
@@ -125,18 +126,10 @@ export function runRuntimeExecutionPipeline(
   const hasSimulatedItem = simulationResult.audit.simulatedItems > 0;
   const lifecycleStates: SignalLifecycleState[] = ['DETECTED', 'GRADED'];
 
-  if (hasPlannedAction) {
-    lifecycleStates.push('PLANNED');
-  }
-  if (hasReadyCommand) {
-    lifecycleStates.push('EXECUTION_READY');
-  }
-  if (hasSimulatedItem) {
-    lifecycleStates.push('SIMULATED');
-  }
-  if (firstRisk?.evaluation.executionAllowed) {
-    lifecycleStates.push('RISK_ACCEPTED');
-  }
+  if (hasPlannedAction) lifecycleStates.push('PLANNED');
+  if (hasReadyCommand) lifecycleStates.push('EXECUTION_READY');
+  if (hasSimulatedItem) lifecycleStates.push('SIMULATED');
+  if (firstRisk?.evaluation.executionAllowed) lifecycleStates.push('RISK_ACCEPTED');
 
   const signalContext = createSignalContext({
     signalId: candidate.signalId ?? candidate.uniqueKey,
@@ -155,6 +148,16 @@ export function runRuntimeExecutionPipeline(
   repository.createSignalRecord(signalContext);
   repository.saveOutcome(signalOutcome);
   repository.saveBenchmark(signalBenchmark);
+
+  // Register only after the signal context has been created. The tracker evaluates
+  // subsequent 15M market data; it does not treat the current signal candle as future data.
+  if (firstRisk?.evaluation.executionAllowed) {
+    defaultMarketDataOutcomeTracker.register({
+      ...candidate,
+      signalContext,
+      signalId: candidate.signalId ?? candidate.uniqueKey,
+    });
+  }
 
   return Object.freeze({
     decisionReport,
@@ -187,39 +190,15 @@ function createRuntimeLearningReport(candidate: NotificationCandidate, candidate
   });
   const comparisonEvidence = Object.freeze({
     metric: 'TPRate' as const,
-    segment: Object.freeze({
-      label: `Grade ${candidate.gradeResult.grade}`,
-      value: tpRate,
-    }),
-    baseline: Object.freeze({
-      label: 'overall' as const,
-      value: 0,
-    }),
+    segment: Object.freeze({ label: `Grade ${candidate.gradeResult.grade}`, value: tpRate }),
+    baseline: Object.freeze({ label: 'overall' as const, value: 0 }),
     difference: tpRate,
     relativeDifference: tpRate,
   });
-  const counts = Object.freeze({
-    TP: tpRate,
-    SL: slRate,
-    BE: 0,
-    EXPIRED: 0,
-    UNKNOWN: 0,
-  });
-  const rates = Object.freeze({
-    TPRate: tpRate,
-    SLRate: slRate,
-    BERate: 0,
-    EXPIREDRate: 0,
-    UNKNOWNRate: 0,
-  });
-  const duration = Object.freeze({
-    averageEvaluationBars: 0,
-    medianEvaluationBars: 0,
-  });
-  const excursion = Object.freeze({
-    averageMFE: 0,
-    averageMAE: 0,
-  });
+  const counts = Object.freeze({ TP: tpRate, SL: slRate, BE: 0, EXPIRED: 0, UNKNOWN: 0 });
+  const rates = Object.freeze({ TPRate: tpRate, SLRate: slRate, BERate: 0, EXPIREDRate: 0, UNKNOWNRate: 0 });
+  const duration = Object.freeze({ averageEvaluationBars: 0, medianEvaluationBars: 0 });
+  const excursion = Object.freeze({ averageMFE: 0, averageMAE: 0 });
   const observation = Object.freeze({
     id: observationId,
     segment: 'grade' as const,
@@ -231,9 +210,7 @@ function createRuntimeLearningReport(candidate: NotificationCandidate, candidate
     comparisonEvidence,
     benchmarkReference,
     explanation: Object.freeze({
-      because: Object.freeze([
-        'Runtime adapter created a deterministic learning observation from the current detection candidate.',
-      ]),
+      because: Object.freeze(['Runtime adapter created a deterministic learning observation from the current detection candidate.']),
       segmentCoverage: coverage,
       overallCoverage: coverage,
       segmentBenchmark: Object.freeze({ counts, rates, duration, excursion }),
@@ -251,36 +228,17 @@ function createRuntimeLearningReport(candidate: NotificationCandidate, candidate
     sampleSize,
     coverage,
     confidence: 'LOW' as const,
-    confidenceFactors: Object.freeze({
-      sample: 'LOW' as const,
-      coverage: 'LOW' as const,
-      stability: 'UNKNOWN' as const,
-    }),
+    confidenceFactors: Object.freeze({ sample: 'LOW' as const, coverage: 'LOW' as const, stability: 'UNKNOWN' as const }),
     comparisonEvidence,
+    provenance: 'SYNTHETIC_RUNTIME' as const,
     evidence: Object.freeze({
       observationId,
-      segmentBenchmark: Object.freeze({
-        TP: tpRate,
-        SL: slRate,
-        BE: 0,
-        EXPIRED: 0,
-        UNKNOWN: 0,
-        sampleSize,
-        coverage,
-      }),
-      overallBenchmark: Object.freeze({
-        TP: tpRate,
-        SL: slRate,
-        sampleSize,
-        coverage,
-      }),
+      segmentBenchmark: Object.freeze({ TP: tpRate, SL: slRate, BE: 0, EXPIRED: 0, UNKNOWN: 0, sampleSize, coverage }),
+      overallBenchmark: Object.freeze({ TP: tpRate, SL: slRate, sampleSize, coverage }),
     }),
     summary: `${candidate.gradeResult.grade} candidate is available for runtime policy evaluation.`,
     explanation: Object.freeze({
-      because: Object.freeze([
-        'Detection produced a grade-allowed candidate.',
-        'Runtime integration uses existing Decision/Execution/Risk contracts without modifying domain code.',
-      ]),
+      because: Object.freeze(['Runtime candidate evidence is synthetic and must not be treated as historical performance evidence.']),
       formula: 'runtime_candidate_grade / 9',
       interpretation: 'DESCRIPTIVE_HISTORICAL_PATTERN' as const,
     }),
@@ -297,12 +255,7 @@ function createRuntimeLearningReport(candidate: NotificationCandidate, candidate
       minSampleSize: 30 as const,
       minCoverageRate: 0.8 as const,
     }),
-    overallLearning: Object.freeze({
-      evaluatedSegments: 1,
-      observations: 1,
-      learnedPatterns: 1,
-      skippedSegments: 0,
-    }),
+    overallLearning: Object.freeze({ evaluatedSegments: 1, observations: 1, learnedPatterns: 1, skippedSegments: 0 }),
     observations: Object.freeze([observation]),
     patterns: Object.freeze([pattern]),
     warnings: Object.freeze([]),
