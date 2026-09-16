@@ -13,6 +13,7 @@ export type LearnedPatternType =
 export type ConfidenceLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 export type ConfidenceFactorLevel = ConfidenceLevel | 'UNKNOWN';
 export type LearningEvidenceProvenance = 'HISTORICAL' | 'SYNTHETIC_RUNTIME';
+export type ConfidenceMethod = 'HEURISTIC_SAMPLE_COVERAGE';
 
 export interface ConfidenceFactors {
   sample: ConfidenceLevel;
@@ -29,6 +30,7 @@ export interface LearnedPattern {
   sampleSize: number;
   coverage: number;
   confidence: ConfidenceLevel;
+  confidenceMethod?: ConfidenceMethod;
   confidenceFactors: ConfidenceFactors;
   /** Provenance is optional for backwards compatibility; omitted means historical. */
   provenance?: LearningEvidenceProvenance;
