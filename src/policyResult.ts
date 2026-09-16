@@ -2,6 +2,7 @@ export type PolicyCheckType =
   | 'MIN_SAMPLE_SIZE'
   | 'MIN_COVERAGE'
   | 'MIN_CONFIDENCE'
+  | 'EVIDENCE_PROVENANCE'
   | 'ALLOWED_PATTERN_TYPE'
   | 'BLOCKED_PATTERN_TYPE'
   | 'REQUIRED_METRIC'
@@ -25,4 +26,3 @@ export interface PatternPolicyResult {
   readonly passed: boolean;
   readonly checks: readonly PolicyCheckResult[];
 }
-
