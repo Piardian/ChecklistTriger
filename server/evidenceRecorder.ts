@@ -198,6 +198,7 @@ export function buildSignalEvidenceRecord(
       breakdown: candidate.gradeResult.breakdown,
       blockReasons: candidate.gradeResult.blockReasons,
     },
+    ...(candidate.signalQualityResult ? { signalQuality: candidate.signalQualityResult } : {}),
     ...(candidate.setupAssessmentV2 && candidate.setupAssessmentComparison ? {
       setupAssessmentShadow: {
         version: candidate.setupAssessmentV2.version,
