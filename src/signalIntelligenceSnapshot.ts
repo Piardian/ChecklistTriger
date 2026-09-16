@@ -8,7 +8,7 @@ export const GRADE_ENGINE_VERSION = 1 as const;
 export interface SignalIntelligenceCandidateSnapshot {
   poiType: 'OB' | 'FVG';
   tradeDirection: 'long' | 'short';
-  currentPrice: number;
+  currentPrice: number | null;
   poiFormedTimestamp: number;
   relatedEventType: 'BOS' | 'CHoCH';
   relatedEventTimestamp: number;
