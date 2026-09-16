@@ -1,8 +1,10 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { NotificationCandidate } from '../server/pipeline';
 import type { Candle } from './types';
 import type { SignalOutcome } from './signalOutcome';
 import { createSignalOutcome } from './signalOutcome';
-import type { SignalRepository } from './signalRepository';
+import { getPipSize as getAssetPipSize } from './assetMetrics';
 
 export interface OutcomeEvaluationPlan {
   readonly entryPrice: number;
@@ -12,23 +14,6 @@ export interface OutcomeEvaluationPlan {
   readonly entryWindowBars: number;
   readonly maxHoldBars: number;
   readonly sameCandleResolution: 'STOP_LOSS_FIRST';
-}
-
-export interface TrackedSignalState {
-  readonly candidate: NotificationCandidate;
-  readonly plan: OutcomeEvaluationPlan;
-  readonly trackingStartTimestamp: number;
-  readonly entryTriggeredAt?: number;
-  readonly entryPrice?: number;
-  readonly mfe?: number;
-  readonly mae?: number;
-}
-
-export interface OutcomeTrackerOptions {
-  readonly entryWindowBars?: number;
-  readonly maxHoldBars?: number;
-  readonly invalidationBufferPips?: number;
-  readonly targetRMultiple?: number;
 }
 
 export interface OutcomeTrackingResult {
@@ -41,6 +26,24 @@ export interface OutcomeTrackingResult {
   readonly rrAchieved: number | null;
   readonly maximumFavorableExcursion: number | null;
   readonly maximumAdverseExcursion: number | null;
+}
+
+export interface OutcomeTrackerOptions {
+  readonly entryWindowBars?: number;
+  readonly maxHoldBars?: number;
+  readonly invalidationBufferPips?: number;
+  readonly targetRMultiple?: number;
+  readonly stateFile?: string;
+}
+
+interface PersistedTrackedSignal {
+  readonly candidate: NotificationCandidate;
+  readonly plan: OutcomeEvaluationPlan;
+  readonly trackingStartTimestamp: number;
+  readonly entryTriggeredAt: number | null;
+  readonly entryPrice: number | null;
+  readonly mfe: number;
+  readonly mae: number;
 }
 
 const DEFAULT_ENTRY_WINDOW_BARS = 16;
@@ -58,7 +61,7 @@ export function buildResearchOutcomePlan(
   const targetRMultiple = positiveNumber(options.targetRMultiple, DEFAULT_TARGET_R_MULTIPLE);
   const zone = resolveZone(candidate);
   const entryPrice = (zone.low + zone.high) / 2;
-  const pipSize = getPipSize(candidate.symbol);
+  const pipSize = getAssetPipSize(candidate.symbol);
   const invalidationBuffer = invalidationBufferPips * pipSize;
 
   if (candidate.tradeDirection === 'long') {
@@ -95,9 +98,7 @@ export function evaluateOutcome(
 ): OutcomeTrackingResult {
   const plan = buildResearchOutcomePlan(candidate, options);
   const startTimestamp = candidate.validationCloseTimestamp ?? candidate.marketDataTimestamp ?? candidate.poi.relatedEvent.breakTimestamp;
-  const future = candles
-    .filter(candle => candle.timestamp > startTimestamp)
-    .sort((a, b) => a.timestamp - b.timestamp);
+  const future = normalizeFutureCandles(candles, startTimestamp);
 
   let entryIndex = -1;
   for (let index = 0; index < Math.min(plan.entryWindowBars, future.length); index += 1) {
@@ -110,17 +111,25 @@ export function evaluateOutcome(
 
   if (entryIndex < 0) {
     if (future.length >= plan.entryWindowBars) {
-      return completedResult(candidate, plan, createSignalOutcome({
-        signalContext: requireSignalContext(candidate),
-        outcomeType: 'EXPIRED',
-        timestamp: future[plan.entryWindowBars - 1].timestamp,
-        reason: {
-          code: 'ENTRY_WINDOW_EXPIRED',
-          message: `Entry was not triggered within ${plan.entryWindowBars} completed 15M candles.`,
-        },
-      }), null, null, null, null, null);
+      return completedResult(
+        plan,
+        createSignalOutcome({
+          signalContext: requireSignalContext(candidate),
+          outcomeType: 'EXPIRED',
+          timestamp: future[plan.entryWindowBars - 1].timestamp,
+          reason: {
+            code: 'ENTRY_WINDOW_EXPIRED',
+            message: `Entry was not triggered within ${plan.entryWindowBars} completed 15M candles.`,
+          },
+        }),
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      );
     }
-
     return waitingResult(plan);
   }
 
@@ -147,10 +156,10 @@ export function evaluateOutcome(
       ? candle.high >= plan.targetPrice
       : candle.low <= plan.targetPrice;
 
+    // OHLC cannot reveal which level was hit first inside a single candle.
+    // Resolve this ambiguity deterministically and conservatively as STOP_LOSS_FIRST.
     if (hitStop) {
-      const rr = -1;
       return completedResult(
-        candidate,
         plan,
         createSignalOutcome({
           signalContext: requireSignalContext(candidate),
@@ -161,19 +170,17 @@ export function evaluateOutcome(
             message: 'Stop level was reached by subsequent market data. Same-candle conflicts resolve to STOP_LOSS_FIRST.',
           },
         }),
-        candle.timestamp,
+        entryCandle.timestamp,
         plan.entryPrice,
         plan.stopPrice,
-        rr,
+        -1,
         mfe,
         mae
       );
     }
 
     if (hitTarget) {
-      const rr = plan.targetPriceDistance / plan.riskDistance;
       return completedResult(
-        candidate,
         plan,
         createSignalOutcome({
           signalContext: requireSignalContext(candidate),
@@ -184,10 +191,10 @@ export function evaluateOutcome(
             message: 'Target level was reached by subsequent market data.',
           },
         }),
-        candle.timestamp,
+        entryCandle.timestamp,
         plan.entryPrice,
         plan.targetPrice,
-        rr,
+        Math.abs(plan.targetPrice - plan.entryPrice) / plan.riskDistance,
         mfe,
         mae
       );
@@ -199,23 +206,21 @@ export function evaluateOutcome(
     const directionalMove = candidate.tradeDirection === 'long'
       ? exitCandle.close - plan.entryPrice
       : plan.entryPrice - exitCandle.close;
-    const rr = directionalMove / plan.riskDistance;
     return completedResult(
-      candidate,
       plan,
       createSignalOutcome({
         signalContext: requireSignalContext(candidate),
         outcomeType: 'EXPIRED',
         timestamp: exitCandle.timestamp,
         reason: {
-          code: 'ENTRY_WINDOW_EXPIRED',
+          code: 'MAX_HOLD_EXPIRED',
           message: `Maximum holding window of ${plan.maxHoldBars} completed 15M candles elapsed without TP or SL.`,
         },
       }),
       entryCandle.timestamp,
       plan.entryPrice,
       exitCandle.close,
-      rr,
+      directionalMove / plan.riskDistance,
       mfe,
       mae
     );
@@ -234,6 +239,102 @@ export function evaluateOutcome(
   };
 }
 
+export class MarketDataOutcomeTracker {
+  private readonly records = new Map<string, PersistedTrackedSignal>();
+  private readonly stateFile: string;
+
+  constructor(options: OutcomeTrackerOptions = {}) {
+    this.stateFile = path.resolve(options.stateFile ?? process.env.OUTCOME_TRACKER_STATE_FILE ?? 'data/active_outcomes.json');
+    this.load();
+  }
+
+  register(candidate: NotificationCandidate, options: OutcomeTrackerOptions = {}): void {
+    const signalId = candidate.signalId ?? candidate.uniqueKey;
+    if (this.records.has(signalId)) return;
+
+    const plan = buildResearchOutcomePlan(candidate, options);
+    const trackingStartTimestamp = candidate.validationCloseTimestamp ?? candidate.marketDataTimestamp ?? candidate.poi.relatedEvent.breakTimestamp;
+    this.records.set(signalId, {
+      candidate,
+      plan,
+      trackingStartTimestamp,
+      entryTriggeredAt: null,
+      entryPrice: null,
+      mfe: 0,
+      mae: 0,
+    });
+    this.persist();
+  }
+
+  process(symbol: string, candles: readonly Candle[], options: OutcomeTrackerOptions = {}): OutcomeTrackingResult[] {
+    const results: OutcomeTrackingResult[] = [];
+    for (const [signalId, record] of [...this.records.entries()]) {
+      if (record.candidate.symbol !== symbol) continue;
+      const result = evaluateOutcome(record.candidate, candles, {
+        ...options,
+        entryWindowBars: options.entryWindowBars ?? record.plan.entryWindowBars,
+        maxHoldBars: options.maxHoldBars ?? record.plan.maxHoldBars,
+      });
+      results.push(result);
+      if (result.status === 'COMPLETED') {
+        this.records.delete(signalId);
+      } else {
+        this.records.set(signalId, {
+          ...record,
+          entryTriggeredAt: result.entryTriggeredAt,
+          entryPrice: result.entryPrice,
+          mfe: result.maximumFavorableExcursion ?? record.mfe,
+          mae: result.maximumAdverseExcursion ?? record.mae,
+        });
+      }
+    }
+    this.persist();
+    return results;
+  }
+
+  has(signalId: string): boolean {
+    return this.records.has(signalId);
+  }
+
+  size(): number {
+    return this.records.size;
+  }
+
+  private load(): void {
+    if (!fs.existsSync(this.stateFile)) return;
+    try {
+      const raw = fs.readFileSync(this.stateFile, 'utf8');
+      const records = JSON.parse(raw) as PersistedTrackedSignal[];
+      if (!Array.isArray(records)) return;
+      for (const record of records) {
+        const signalId = record.candidate.signalId ?? record.candidate.uniqueKey;
+        if (signalId) this.records.set(signalId, record);
+      }
+    } catch {
+      // Corrupt tracker state must not crash the polling process. Start empty.
+    }
+  }
+
+  private persist(): void {
+    try {
+      fs.mkdirSync(path.dirname(this.stateFile), { recursive: true });
+      const temp = `${this.stateFile}.${process.pid}.${Date.now()}.tmp`;
+      fs.writeFileSync(temp, JSON.stringify([...this.records.values()], null, 2), 'utf8');
+      fs.renameSync(temp, this.stateFile);
+    } catch {
+      // Outcome tracking is best-effort persistence; market evaluation remains in-memory.
+    }
+  }
+}
+
+export const defaultMarketDataOutcomeTracker = new MarketDataOutcomeTracker();
+
+function normalizeFutureCandles(candles: readonly Candle[], startTimestamp: number): Candle[] {
+  return [...candles]
+    .filter(candle => Number.isFinite(candle.timestamp) && candle.timestamp > startTimestamp)
+    .sort((a, b) => a.timestamp - b.timestamp);
+}
+
 function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
   return {
     status: 'WAITING_ENTRY',
@@ -249,7 +350,6 @@ function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
 }
 
 function completedResult(
-  candidate: NotificationCandidate,
   plan: OutcomeEvaluationPlan,
   outcome: SignalOutcome,
   entryTriggeredAt: number | null,
@@ -286,14 +386,6 @@ function resolveZone(candidate: NotificationCandidate): { low: number; high: num
   }
   const fvg = candidate.poi as { gapLow: number; gapHigh: number };
   return { low: fvg.gapLow, high: fvg.gapHigh };
-}
-
-function getPipSize(symbol: string): number {
-  const upper = symbol.toUpperCase();
-  if (upper.includes('JPY')) return 0.01;
-  if (upper.startsWith('XAU')) return 0.1;
-  if (upper === 'NAS100' || upper === 'US100' || upper === 'US30' || upper === 'SPX500' || upper === 'GER40') return 1;
-  return 0.0001;
 }
 
 function positiveInteger(value: number | undefined, fallback: number): number {
