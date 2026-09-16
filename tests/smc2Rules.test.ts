@@ -2,6 +2,7 @@ import { MAX_POI_AGE_MS, isDistanceExcessive } from '../server/pipeline';
 import { calculateGrade, GradeInput } from '../src/gradeCalculator';
 import { SetupFamilyGuard } from '../server/setupFamilyGuard';
 import type { NotificationCandidate } from '../server/pipeline';
+import { isBoxTooNarrow, getMinimumBoxSize } from '../src/assetMetrics';
 
 function dummyInput(): GradeInput {
   return {
@@ -58,6 +59,11 @@ describe('SMC Engine 2.0 Hardening Rules (Benchmark Driven)', () => {
     it('should block Forex JPY pairs when distance > 50 points/pips', () => {
       expect(isDistanceExcessive('CHFJPY', 192.807, 195.412, 195.508)).toBe(true);
       expect(isDistanceExcessive('CHFJPY', 193.600, 193.300, 193.400)).toBe(false);
+    });
+
+    it('should block Gold (XAUUSD) when distance > 25 USD or > 0.60%', () => {
+      expect(isDistanceExcessive('XAUUSD', 4450.00, 4400.00, 4410.00)).toBe(true); // 40 USD away
+      expect(isDistanceExcessive('XAUUSD', 4415.00, 4400.00, 4410.00)).toBe(false); // 5 USD away
     });
 
     it('should block Crypto when percentage distance > 1.5%', () => {
@@ -267,5 +273,38 @@ describe('SMC Engine 2.0 Hardening Rules (Benchmark Driven)', () => {
       expect(result.blockReasons).toContain('Karsi Engel: 10 pip yukarida 15M Bearish OB mevcut');
     });
   });
+
+  describe('Rule 8: Box Width & Micro-Stop Filter', () => {
+    it('should reject GBPCHF box when narrower than 5.0 pips (Sinyal 18 & 49 stop trap)', () => {
+      // 1.09668 - 1.09624 = 0.00044 -> 4.4 pips
+      expect(isBoxTooNarrow('GBPCHF', 1.09624, 1.09668)).toBe(true);
+      // 8.0 pip box passes
+      expect(isBoxTooNarrow('GBPCHF', 1.09600, 1.09680)).toBe(false);
+    });
+
+    it('should reject LTCUSD box when percentage height < 0.25% (Sinyal 12 & 16 stop trap)', () => {
+      // 49.79 - 49.71 = 0.08 USD (~0.16% at price 49.75)
+      expect(isBoxTooNarrow('LTCUSD', 49.71, 49.79)).toBe(true);
+      // 0.35 USD box (~0.70%) passes
+      expect(isBoxTooNarrow('LTCUSD', 50.00, 50.35)).toBe(false);
+    });
+
+    it('should reject Gold (XAUUSD) box when narrower than 25 pips ($2.50 USD) (Sinyal 1)', () => {
+      // 4658.90 - 4656.98 = $1.92 USD (19.2 pips)
+      expect(isBoxTooNarrow('XAUUSD', 4656.98, 4658.90)).toBe(true);
+      // $5.00 USD (50 pips) passes
+      expect(isBoxTooNarrow('XAUUSD', 4420.00, 4425.00)).toBe(false);
+    });
+
+    it('should allow valid winning boxes (EURUSD, USDJPY, NZDUSD)', () => {
+      // EURUSD 19.7 pips (Sinyal 10 TP)
+      expect(isBoxTooNarrow('EURUSD', 1.16029, 1.16226)).toBe(false);
+      // USDJPY 9.1 pips (Sinyal 48 Active)
+      expect(isBoxTooNarrow('USDJPY', 153.821, 153.912)).toBe(false);
+      // NZDUSD 3.1 pips (Sinyal 52 Active)
+      expect(isBoxTooNarrow('NZDUSD', 0.58333, 0.58364)).toBe(false);
+    });
+  });
 });
+
 

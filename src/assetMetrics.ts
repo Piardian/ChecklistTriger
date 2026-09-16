@@ -182,3 +182,83 @@ export function calculateDistance(
     isInZone: false,
   });
 }
+
+export interface MinimumBoxSizeSpec {
+  readonly minUnits: number;
+  readonly minPercent?: number;
+}
+
+export function getMinimumBoxSize(symbol: string): MinimumBoxSizeSpec {
+  const assetClass = detectAssetClass(symbol);
+  const upper = symbol.toUpperCase();
+
+  if (assetClass === 'FOREX') {
+    // Volatile crosses or wide-spread pairs require at least 5.0 pips
+    const isVolatileCross = upper.includes('CHF') || upper.includes('CAD');
+    return Object.freeze({ minUnits: isVolatileCross ? 5.0 : 2.8 });
+  }
+
+  if (assetClass === 'FOREX_JPY') {
+    // JPY crosses (GBPJPY, CHFJPY, EURJPY) require at least 5.0 pips (0.05 on price)
+    const isCross = upper.startsWith('GBP') || upper.startsWith('CHF') || upper.startsWith('EUR');
+    return Object.freeze({ minUnits: isCross ? 5.0 : 4.0 });
+  }
+
+  if (assetClass === 'COMMODITY') {
+    if (upper.startsWith('XAU')) {
+      return Object.freeze({ minUnits: 25.0 }); // $2.50 USD (25 pips @ 0.1 pip size)
+    }
+    return Object.freeze({ minUnits: 15.0 });
+  }
+
+  if (assetClass === 'CRYPTO') {
+    if (upper.startsWith('BTC')) {
+      return Object.freeze({ minUnits: 50.0, minPercent: 0.06 });
+    }
+    // Altcoins (ETH, SOL, LTC) require at least 0.25% box height
+    return Object.freeze({ minUnits: 0, minPercent: 0.25 });
+  }
+
+  if (assetClass === 'INDEX') {
+    return Object.freeze({ minUnits: 2.0, minPercent: 0.15 });
+  }
+
+  return Object.freeze({ minUnits: 3.0 });
+}
+
+export function isBoxTooNarrow(
+  symbol: string,
+  zoneLow: number,
+  zoneHigh: number,
+  atrPips?: number | null
+): boolean {
+  const zoneWidthRaw = Math.max(0, zoneHigh - zoneLow);
+  const midPrice = (zoneHigh + zoneLow) / 2;
+  if (midPrice <= 0 || zoneWidthRaw <= 0) return true;
+
+  const pip = getPipSize(symbol);
+  const zoneWidthUnits = zoneWidthRaw / pip;
+  const zoneWidthPercent = (zoneWidthRaw / midPrice) * 100;
+
+  const minSpec = getMinimumBoxSize(symbol);
+
+  // 1. Minimum percent check (Crypto / Index)
+  if (minSpec.minPercent !== undefined && zoneWidthPercent < minSpec.minPercent) {
+    return true;
+  }
+
+  // 2. Minimum units check (Forex / Commodity pips)
+  if (minSpec.minUnits > 0 && zoneWidthUnits < minSpec.minUnits) {
+    return true;
+  }
+
+  // 3. Dynamic ATR check if ATR is provided (must be at least 25% of 15M ATR)
+  if (atrPips !== undefined && atrPips !== null && atrPips > 0) {
+    if (zoneWidthUnits < 0.25 * atrPips) {
+      return true;
+    }
+  }
+
+  return false;
+}
+

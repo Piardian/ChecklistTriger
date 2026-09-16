@@ -101,12 +101,21 @@ export function evaluateKillzoneFilter(now: Date = new Date()): KillzoneFilterMo
   };
 }
 
+export function isCryptoSymbol(symbol?: string): boolean {
+  if (!symbol) return false;
+  const s = symbol.toUpperCase();
+  return s.includes('BTC') || s.includes('ETH') || s.includes('SOL') || s.includes('LTC');
+}
+
 /**
  * Non-bypassable market closure. PVP acceleration may relax intraday
  * killzones, but it must never create Friday-close/weekend/Monday-pre-open
  * notifications from stale or synthetic candles.
  */
-export function evaluateHardMarketWindow(now: Date = new Date()): { active: boolean; reason: string } {
+export function evaluateHardMarketWindow(now: Date = new Date(), symbol?: string): { active: boolean; reason: string } {
+  if (isCryptoSymbol(symbol)) {
+    return { active: true, reason: 'crypto_24_7_open' };
+  }
   const newYork = zonedParts(now, 'America/New_York');
   if (newYork.weekday === 'Fri' && newYork.hour >= 17) {
     return { active: false, reason: 'friday_new_york_closed' };

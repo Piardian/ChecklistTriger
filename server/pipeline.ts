@@ -21,7 +21,7 @@ import { compareV1GradeWithV2Assessment, SetupAssessmentComparison } from '../sr
 import { DetectorResult, SetupAssessment } from '../src/setupAssessment';
 import { recordPipelineFilterTelemetry, recordPoiLifecycleTelemetry } from './telemetry';
 import { Symbol } from './universe';
-import { getPipSize, calculateDistance, detectAssetClass } from '../src/assetMetrics';
+import { getPipSize, calculateDistance, detectAssetClass, isBoxTooNarrow } from '../src/assetMetrics';
 import { consolidateCandidates } from '../src/poiConsolidator';
 import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
@@ -317,6 +317,14 @@ export function runPipeline(
       continue;
     }
 
+    // Box Width / Micro-Stop Filter (Anti-Noise & Spread Trap)
+    const atrPips = averageTrueRangePips(candles15mCast, lastIndex15m, symbol, 14);
+    if (isBoxTooNarrow(symbol, ob.low, ob.high, atrPips)) {
+      reject('box_too_narrow_micro_stop');
+      observePoiLifecycle('OB', ob, formedTimestamp, ['box_too_narrow_micro_stop']);
+      continue;
+    }
+
     // Range, Sweeps, Model
     const rangeStates = candles15mCast.map((_, idx) =>
       calculateRange(candles15mCast, swings15m, structureState15m, idx)
@@ -483,6 +491,14 @@ export function runPipeline(
       continue;
     }
 
+    // Box Width / Micro-Stop Filter (Anti-Noise & Spread Trap)
+    const atrPips = averageTrueRangePips(candles15mCast, lastIndex15m, symbol, 14);
+    if (isBoxTooNarrow(symbol, fvg.gapLow, fvg.gapHigh, atrPips)) {
+      reject('box_too_narrow_micro_stop');
+      observePoiLifecycle('FVG', fvg, formedTimestamp, ['box_too_narrow_micro_stop']);
+      continue;
+    }
+
     // Range, Sweeps, Model
     const rangeStates = candles15mCast.map((_, idx) =>
       calculateRange(candles15mCast, swings15m, structureState15m, idx)
@@ -626,7 +642,14 @@ export function isDistanceExcessive(
   if (assetClass === 'FOREX_JPY') {
     return distInfo.distanceUnits > 50;
   }
-  // CRYPTO, COMMODITY, INDEX
+  if (assetClass === 'COMMODITY') {
+    if (symbol.toUpperCase().startsWith('XAU')) {
+      // Gold intraday max distance: 25.0 USD (250 pips) or 0.60%
+      return distInfo.distanceUnits > 25.0 || distInfo.percentDistance > 0.60;
+    }
+    return distInfo.percentDistance > 1.0;
+  }
+  // CRYPTO, INDEX
   return distInfo.percentDistance > 1.5;
 }
 
