@@ -7,7 +7,7 @@ export function detectPatterns(observations: readonly LearningObservation[]): re
 }
 
 function toPattern(observation: LearningObservation): LearnedPattern {
-  const { confidence, confidenceFactors } = calculateConfidence({
+  const { confidence, confidenceMethod, confidenceFactors } = calculateConfidence({
     sampleSize: observation.sampleSize,
     coverage: observation.coverage,
   });
@@ -23,6 +23,7 @@ function toPattern(observation: LearningObservation): LearnedPattern {
     sampleSize: observation.sampleSize,
     coverage: observation.coverage,
     confidence,
+    confidenceMethod,
     confidenceFactors: Object.freeze(confidenceFactors),
     comparisonEvidence: observation.comparisonEvidence,
     evidence: Object.freeze({
