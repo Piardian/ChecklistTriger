@@ -132,7 +132,7 @@ describe('Market data outcome tracker', () => {
     expect(result.rrAchieved).toBe(-1);
   });
 
-  test('persists active tracking state and removes a signal after completion', () => {
+  test('keeps a completed signal until durable outcome evidence is acknowledged', () => {
     const fs = require('fs');
     const path = require('path');
     const stateFile = path.join(process.cwd(), 'data', `outcome-test-${Date.now()}.json`);
@@ -147,6 +147,8 @@ describe('Market data outcome tracker', () => {
 
       expect(results).toHaveLength(1);
       expect(results[0].status).toBe('COMPLETED');
+      expect(tracker.has(candidate.signalId!)).toBe(true);
+      expect(tracker.acknowledgeCompleted(candidate.signalId!)).toBe(true);
       expect(tracker.has(candidate.signalId!)).toBe(false);
     } finally {
       try { fs.unlinkSync(stateFile); } catch {}
