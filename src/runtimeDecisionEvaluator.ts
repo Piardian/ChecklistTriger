@@ -29,7 +29,7 @@ export function generateRuntimeDecisionReport(input: RuntimeDecisionInput): Deci
     id: decisionId,
     status,
     policyResults,
-    reason: Object.freeze(reasonForStatus(status)),
+    reason: Object.freeze(reasonForStatus(status, input.calibration)),
     summary: `${patternId} is ${status} under runtime admission policy ${input.policyId}.`,
     explanation: Object.freeze({
       policyReference: Object.freeze({
@@ -116,23 +116,25 @@ function determineRuntimeStatus(
   gradeResult: GradeResult,
   calibration: DecisionCalibrationResult
 ): DecisionEvaluationStatus {
-  if (!gradeResult.entryAllowed) return 'NOT_ELIGIBLE';
-
-  switch (calibration.status) {
-    case 'ELIGIBLE':
-      return 'ELIGIBLE';
-    case 'WAIT':
-      return 'WAIT';
-    case 'LOW_CONFIDENCE':
-      return 'LOW_CONFIDENCE';
-    case 'FILTERED':
-      return 'FILTERED';
-    case 'NOT_ELIGIBLE':
-      return 'NOT_ELIGIBLE';
+  if (calibration.status !== 'ELIGIBLE') {
+    return calibration.status;
   }
+  if (!gradeResult.entryAllowed) {
+    return 'NOT_ELIGIBLE';
+  }
+  return 'ELIGIBLE';
 }
 
-function reasonForStatus(status: DecisionEvaluationStatus): DecisionEvaluation['reason'] {
+function reasonForStatus(
+  status: DecisionEvaluationStatus,
+  calibration: DecisionCalibrationResult
+): DecisionEvaluation['reason'] {
+  if (calibration.status !== 'ELIGIBLE' && calibration.reason) {
+    return calibration.reason;
+  }
+  if (!calibration.reason && status === 'NOT_ELIGIBLE') {
+    return { code: 'NOT_ELIGIBLE', message: 'Current candidate failed production admission gates.' };
+  }
   switch (status) {
     case 'ELIGIBLE':
       return { code: 'RUNTIME_ADMISSION_PASSED', message: 'Current candidate passed grade and runtime context admission gates.' };

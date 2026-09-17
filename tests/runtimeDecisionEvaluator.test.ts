@@ -73,7 +73,7 @@ describe('generateRuntimeDecisionReport', () => {
       policyVersion: 1,
     });
 
-    expect(report.decisions[0].status).toBe('NOT_ELIGIBLE');
+    expect(report.decisions[0].status).toBe('FILTERED');
     expect(report.decisions[0].policyResults.passed).toBe(false);
     expect(report.decisions[0].policyResults.checks.some(check => check.status === 'FAIL')).toBe(true);
   });

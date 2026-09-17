@@ -89,7 +89,7 @@ describe('Market data outcome tracker', () => {
   test('records entry and take profit from subsequent candles only', () => {
     const candidate = buildCandidate();
     const future = [
-      candle(20000, 1.12, 1.125, 1.106, 1.115),
+      candle(20000, 1.12, 1.125, 1.104, 1.115),
       candle(920000, 1.115, 1.116, 1.11, 1.114),
       candle(1820000, 1.114, 1.116, 1.112, 1.115),
       candle(2720000, 1.115, 1.12, 1.114, 1.119),
