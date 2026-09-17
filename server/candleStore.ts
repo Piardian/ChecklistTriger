@@ -118,7 +118,7 @@ export class CandleStore {
     }
   }
 
-  private async processOutcomeTracking(symbol: Symbol, candles: readonly StoredCandle[]): Promise<void> {
+  private async processOutcomeTracking(symbol: string, candles: readonly StoredCandle[]): Promise<void> {
     try {
       const { defaultMarketDataOutcomeTracker } = await import('../src/signalOutcomeTracker');
       const { appendCompletedSignalOutcomeEvidenceAsync } = await import('./outcomeEvidenceRecorder');
@@ -128,7 +128,7 @@ export class CandleStore {
         if (result.status !== 'COMPLETED' || !result.outcome) continue;
 
         const signalId = result.outcome.signalId;
-        appendCompletedSignalOutcomeEvidenceAsync({
+        await appendCompletedSignalOutcomeEvidenceAsync({
           signalId,
           outcomeType: normalizeOutcomeType(result.outcome.outcomeType),
           holdingTimeMs: result.entryTriggeredAt === null
@@ -142,6 +142,7 @@ export class CandleStore {
           evaluation: result.evaluation,
         });
 
+        defaultMarketDataOutcomeTracker.acknowledgeCompleted(signalId);
         console.log(
           `[OutcomeTracker] ${signalId} -> ${result.outcome.outcomeType}` +
           ` | RR=${result.rrAchieved ?? 'n/a'}` +
