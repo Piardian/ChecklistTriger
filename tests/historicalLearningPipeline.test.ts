@@ -10,7 +10,12 @@ function writeFixture(lines: object[]): string {
   return filePath;
 }
 
-function signal(signalId: string, timestamp: number, grade: 'A+' | 'A' = 'A') {
+function signal(
+  signalId: string,
+  timestamp: number,
+  grade: 'A+' | 'A' = 'A',
+  session: 'london' | 'new_york' = 'london'
+) {
   return {
     evidenceSchemaVersion: 1,
     metadata: {
@@ -43,7 +48,7 @@ function signal(signalId: string, timestamp: number, grade: 'A+' | 'A' = 'A') {
       confidence: 80,
       status: 'excellent',
       metrics: { barsSinceFormation: 2, barsSinceBreak: 1, distanceToPoiPips: 2, poiRelation: 'inside', poiTestCount: 0, isFresh: true, isNearPoi: true, invalidationRisk: 'low' },
-      marketContext: { session: 'london', killzone: true, dayOfWeek: 2, hourTR: 10 },
+      marketContext: { session, killzone: true, dayOfWeek: 2, hourTR: 10 },
       reasons: [],
       warnings: [],
     },
@@ -109,6 +114,37 @@ test('historical learning uses an ordered and purged train split with separate O
     expect(result.learningReport.metadata.generatedAtDatasetCoverage).toBe(1);
     expect(result.outOfSampleSegmentedBenchmark?.metadata.generatedAtDatasetCoverage).toBe(1);
     expect(result.outOfSampleValidation.outOfSampleSampleSize).toBe(12);
+  } finally {
+    fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
+    fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
+  }
+});
+
+test('validates only out-of-sample effects that preserve direction and minimum effect size', () => {
+  const base = 1700000000000;
+  const signals = Array.from({ length: 200 }, (_, index) => signal(
+    `S${index + 1}`,
+    base + index * 900000,
+    'A',
+    index < 100 ? 'london' : 'new_york'
+  ));
+  const outcomes = signals.map((item, index) => outcome(
+    item.metadata.signalId,
+    base + index * 900000 + 1800000,
+    index < 100 ? 'TP' : 'SL'
+  ));
+  const signalsFile = writeFixture(signals);
+  const outcomesFile = writeFixture(outcomes);
+  try {
+    const result = generateHistoricalLearningReport({ signalsFile, outcomesFile });
+    const sessionResults = result.outOfSampleValidation.patterns.filter(pattern => pattern.segment === 'session' && pattern.metric === 'TPRate');
+
+    expect(result.temporalSplit?.train.items).toHaveLength(138);
+    expect(result.temporalSplit?.outOfSample.items).toHaveLength(60);
+    expect(result.learningReport.patterns.length).toBeGreaterThan(0);
+    expect(sessionResults).toHaveLength(2);
+    expect(sessionResults.every(pattern => pattern.status === 'VALIDATED')).toBe(true);
+    expect(sessionResults.every(pattern => Math.abs(pattern.outOfSampleDifference ?? 0) >= 0.05)).toBe(true);
   } finally {
     fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
     fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
