@@ -87,7 +87,7 @@ test('builds a validated dataset from matched signal and outcome evidence', () =
   }
 });
 
-test('historical learning uses an ordered train split and exposes a separate OOS validation report', () => {
+test('historical learning uses an ordered and purged train split with separate OOS validation', () => {
   const base = 1700000000000;
   const signals = Array.from({ length: 40 }, (_, index) => signal(`S${index + 1}`, base + index * 900000, index % 2 === 0 ? 'A' : 'A+'));
   const outcomes = signals.map((item, index) => outcome(item.metadata.signalId, base + index * 900000 + 1800000, index % 2 === 0 ? 'TP' : 'SL'));
@@ -97,9 +97,14 @@ test('historical learning uses an ordered train split and exposes a separate OOS
     const result = generateHistoricalLearningReport({ signalsFile, outcomesFile });
     expect(result.dataset.items).toHaveLength(40);
     expect(result.temporalSplit).toBeDefined();
-    expect(result.temporalSplit?.train.items).toHaveLength(28);
+    expect(result.temporalSplit?.rawTrainCandidateCount).toBe(28);
+    expect(result.temporalSplit?.purgedTrainCount).toBe(2);
+    expect(result.temporalSplit?.train.items).toHaveLength(26);
     expect(result.temporalSplit?.outOfSample.items).toHaveLength(12);
     expect(result.temporalSplit?.trainCutoffTimestamp).toBe(result.temporalSplit?.train.items.at(-1)?.snapshot.timestamp);
+    expect(result.temporalSplit?.train.items.at(-1)?.outcome.metadata.endTimestamp).toBeLessThan(
+      Date.parse(result.temporalSplit?.outOfSampleStartTimestamp ?? '')
+    );
     expect(result.learningReport.metadata.datasetFingerprint).toBe(result.segmentedBenchmark.metadata.datasetFingerprint);
     expect(result.outOfSampleSegmentedBenchmark).toBeDefined();
     expect(result.outOfSampleValidation.outOfSampleSampleSize).toBe(12);
