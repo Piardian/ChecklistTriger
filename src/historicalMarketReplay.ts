@@ -8,6 +8,14 @@ import {
   OutcomeTrackerOptions,
   OutcomeTrackingResult,
 } from './signalOutcomeTracker';
+import { JsonlEvidenceStore } from '../server/evidenceStore';
+import { buildSignalEvidenceRecord } from '../server/evidenceRecorder';
+import { runRuntimeExecutionPipeline } from '../server/runtimeExecutionPipeline';
+import { NoopSignalRepository } from './signalRepository';
+import {
+  createCompletedSignalOutcomeEvidence,
+  createSignalPricePathEvidenceRecord,
+} from './signalEvidence';
 
 export const HISTORICAL_MARKET_REPLAY_VERSION = 1 as const;
 
@@ -98,6 +106,9 @@ export interface HistoricalMarketReplayOptions {
   readonly outcomeOptions?: OutcomeTrackerOptions;
   readonly seedSeenKeys?: readonly string[];
   readonly candidateGenerator?: HistoricalMarketReplayCandidateGenerator;
+  readonly recordEvidence?: boolean;
+  readonly evidenceDir?: string;
+  readonly includePricePath?: boolean;
 }
 
 class HistoricalReplayCandleStore extends CandleStore {
@@ -223,8 +234,18 @@ export function runHistoricalMarketReplay(
       }
       notifiedStore.markSeen(dedupeKeys);
 
-      const outcome = evaluateOutcome(candidate, boundedOutcomeCandles, options.outcomeOptions);
+      const outcomeOptions: OutcomeTrackerOptions = {
+        ...options.outcomeOptions,
+        includePricePath: options.includePricePath ?? options.outcomeOptions?.includePricePath,
+      };
+
+      const outcome = evaluateOutcome(candidate, boundedOutcomeCandles, outcomeOptions);
       trades.push(createReplayTrade(candidate, candle.timestamp, outcome));
+
+      if (options.recordEvidence) {
+        const evidenceDir = options.evidenceDir ?? 'evidence/replay';
+        recordReplayEvidence(candidate, candleStore.getCandles(candidate.symbol, '15m'), outcome, evidenceDir);
+      }
     }
   }
 
@@ -459,3 +480,67 @@ function withTelemetryDisabled<T>(fn: () => T): T {
     }
   }
 }
+
+function recordReplayEvidence(
+  candidate: NotificationCandidate,
+  candles15m: readonly StoredCandle[],
+  outcome: OutcomeTrackingResult,
+  evidenceDir: string
+): void {
+  const store = new JsonlEvidenceStore(evidenceDir);
+  const execution = runRuntimeExecutionPipeline(candidate, new NoopSignalRepository());
+  const signalRecord = buildSignalEvidenceRecord(candidate, execution, candles15m);
+  void store.appendSignalEvidence(signalRecord);
+
+  if (outcome.outcome && outcome.evaluation) {
+    const outcomeType = outcome.outcome.outcomeType === 'TAKE_PROFIT'
+      ? 'TP'
+      : outcome.outcome.outcomeType === 'STOP_LOSS'
+        ? 'SL'
+        : outcome.outcome.outcomeType === 'EXPIRED'
+          ? 'EXPIRED'
+          : 'UNKNOWN';
+
+    const outcomeRecord = createCompletedSignalOutcomeEvidence({
+      signalId: signalRecord.metadata.signalId,
+      outcome: {
+        type: outcomeType,
+        holdingTimeMs: outcome.calendarDurationMs,
+        holdingBars: outcome.holdingBars,
+        rrAchieved: outcome.rrAchieved,
+        maximumFavorableExcursion: outcome.maximumFavorableExcursion,
+        maximumAdverseExcursion: outcome.maximumAdverseExcursion,
+        exitTimestamp: outcome.outcome.timestamp,
+        exitPrice: outcome.exitPrice,
+        exitReason: outcome.outcome.reason.message,
+      },
+      entry: {
+        triggered: outcome.entryTriggeredAt !== null,
+        timestamp: outcome.entryTriggeredAt,
+        price: outcome.entryPrice,
+        entryMode: outcome.plan.entryMode ?? 'midpoint',
+      },
+      risk: {
+        stop: outcome.plan.stopPrice,
+        target: outcome.plan.targetPrice,
+        riskDistance: outcome.plan.riskDistance,
+        targetR: outcome.plan.targetRMultiple ?? 2,
+      },
+      evaluation: outcome.evaluation,
+    });
+    void store.appendOutcomeEvidence(outcomeRecord);
+  }
+
+  if (outcome.pricePath && outcome.pricePath.length > 0) {
+    const pricePathRecord = createSignalPricePathEvidenceRecord({
+      signalId: signalRecord.metadata.signalId,
+      symbol: candidate.symbol,
+      recordedAt: new Date().toISOString(),
+      points: outcome.pricePath,
+    });
+    if (store.appendPricePathEvidence) {
+      void store.appendPricePathEvidence(pricePathRecord);
+    }
+  }
+}
+

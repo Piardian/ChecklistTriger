@@ -66,7 +66,7 @@ export function buildHistoricalLearningDataset(options: HistoricalLearningAdapte
 }
 
 function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | null {
-  if (record.evidenceSchemaVersion !== 1 || !record.signalQuality) return null;
+  if (![1, 2].includes(record.evidenceSchemaVersion) || !record.signalQuality) return null;
   if (!SUPPORTED_SYMBOLS.includes(record.metadata.symbol)) return null;
   if (!['long', 'short'].includes(record.metadata.direction)) return null;
   if (!['OB', 'FVG'].includes(record.poi.poiType)) return null;
@@ -101,13 +101,13 @@ function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | 
 }
 
 function toOutcomeResult(evidence: CompletedSignalOutcomeEvidence, snapshot: SignalIntelligenceSnapshot | undefined): OutcomeResult | null {
-  if (!snapshot || evidence.evidenceSchemaVersion !== 1 || !Number.isFinite(evidence.outcome.exitTimestamp)) return null;
+  if (!snapshot || ![1, 2].includes(evidence.evidenceSchemaVersion) || !Number.isFinite(evidence.outcome.exitTimestamp)) return null;
   // MANUAL and CANCELLED are real lifecycle outcomes, but the benchmark's label space
   // has no equivalent. Exclude them instead of mislabelling them as insufficient data.
   if (evidence.outcome.type === 'MANUAL' || evidence.outcome.type === 'CANCELLED') return null;
 
   const evaluation = evidence.evaluation;
-  if (evaluation && evaluation.version !== 1) return null;
+  if (evaluation && ![1, 2].includes(evaluation.version)) return null;
 
   const fallbackStartTimestamp = new Date(snapshot.timestamp).getTime();
   const startTimestamp = evaluation?.evaluationStartTimestamp ?? fallbackStartTimestamp;

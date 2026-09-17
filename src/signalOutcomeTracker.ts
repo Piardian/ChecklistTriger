@@ -4,7 +4,7 @@ import type { NotificationCandidate } from '../server/pipeline';
 import type { Candle } from './types';
 import type { SignalOutcome } from './signalOutcome';
 import { createSignalOutcome } from './signalOutcome';
-import type { CompletedSignalOutcomeEvaluationEvidence } from './signalEvidence';
+import type { CompletedSignalOutcomeEvaluationEvidence, EvaluatedCandlePathPoint } from './signalEvidence';
 import { getPipSize as getAssetPipSize } from './assetMetrics';
 
 export interface OutcomeEvaluationPlan {
@@ -15,6 +15,8 @@ export interface OutcomeEvaluationPlan {
   readonly entryWindowBars: number;
   readonly maxHoldBars: number;
   readonly sameCandleResolution: 'STOP_LOSS_FIRST';
+  readonly entryMode?: 'midpoint' | 'zone_touch';
+  readonly targetRMultiple?: number;
 }
 
 export interface OutcomeTrackingResult {
@@ -27,7 +29,10 @@ export interface OutcomeTrackingResult {
   readonly rrAchieved: number | null;
   readonly maximumFavorableExcursion: number | null;
   readonly maximumAdverseExcursion: number | null;
+  readonly holdingBars: number | null;
+  readonly calendarDurationMs: number | null;
   readonly evaluation: CompletedSignalOutcomeEvaluationEvidence | null;
+  readonly pricePath?: readonly EvaluatedCandlePathPoint[];
 }
 
 export interface OutcomeTrackerOptions {
@@ -37,6 +42,7 @@ export interface OutcomeTrackerOptions {
   readonly targetRMultiple?: number;
   readonly stateFile?: string;
   readonly entryMode?: 'midpoint' | 'zone_touch';
+  readonly includePricePath?: boolean;
 }
 
 interface PersistedTrackedSignal {
@@ -63,7 +69,8 @@ export function buildResearchOutcomePlan(
   const invalidationBufferPips = positiveNumber(options.invalidationBufferPips, DEFAULT_INVALIDATION_BUFFER_PIPS);
   const targetRMultiple = positiveNumber(options.targetRMultiple, DEFAULT_TARGET_R_MULTIPLE);
   const zone = resolveZone(candidate);
-  const entryPrice = options.entryMode === 'zone_touch'
+  const entryMode = options.entryMode ?? 'midpoint';
+  const entryPrice = entryMode === 'zone_touch'
     ? (candidate.tradeDirection === 'long' ? zone.high : zone.low)
     : (zone.low + zone.high) / 2;
   const pipSize = getAssetPipSize(candidate.symbol);
@@ -80,6 +87,8 @@ export function buildResearchOutcomePlan(
       entryWindowBars,
       maxHoldBars,
       sameCandleResolution: 'STOP_LOSS_FIRST',
+      entryMode,
+      targetRMultiple,
     });
   }
 
@@ -93,6 +102,8 @@ export function buildResearchOutcomePlan(
     entryWindowBars,
     maxHoldBars,
     sameCandleResolution: 'STOP_LOSS_FIRST',
+    entryMode,
+    targetRMultiple,
   });
 }
 
@@ -104,6 +115,7 @@ export function evaluateOutcome(
   const plan = buildResearchOutcomePlan(candidate, options);
   const startTimestamp = candidate.validationCloseTimestamp ?? candidate.marketDataTimestamp ?? candidate.poi.relatedEvent.breakTimestamp;
   const future = normalizeFutureCandles(candles, startTimestamp);
+  const includePricePath = options.includePricePath === true;
 
   let entryIndex = -1;
   for (let index = 0; index < Math.min(plan.entryWindowBars, future.length); index += 1) {
@@ -117,6 +129,11 @@ export function evaluateOutcome(
   if (entryIndex < 0) {
     if (future.length >= plan.entryWindowBars) {
       const exitCandle = future[plan.entryWindowBars - 1];
+      const evaluatedCandles = plan.entryWindowBars;
+      const pricePath = includePricePath
+        ? buildEvaluatedPricePath(future.slice(0, evaluatedCandles), plan, candidate.tradeDirection, -1)
+        : undefined;
+
       return completedResult(
         plan,
         startTimestamp,
@@ -136,7 +153,10 @@ export function evaluateOutcome(
         null,
         null,
         null,
-        plan.entryWindowBars
+        evaluatedCandles,
+        undefined,
+        undefined,
+        pricePath
       );
     }
     return waitingResult(plan);
@@ -171,6 +191,12 @@ export function evaluateOutcome(
     // OHLC cannot reveal which level was hit first inside a single post-entry candle.
     // Resolve this ambiguity deterministically and conservatively as STOP_LOSS_FIRST.
     if (hitStop) {
+      const evaluatedCandles = entryIndex + 1 + offset + 1;
+      const exitIndex = entryIndex + 1 + offset;
+      const pricePath = includePricePath
+        ? buildEvaluatedPricePath(future.slice(0, exitIndex + 1), plan, candidate.tradeDirection, entryIndex)
+        : undefined;
+
       return completedResult(
         plan,
         startTimestamp,
@@ -190,11 +216,20 @@ export function evaluateOutcome(
         -1,
         mfe,
         mae,
-        entryIndex + 1 + offset + 1
+        evaluatedCandles,
+        entryIndex,
+        exitIndex,
+        pricePath
       );
     }
 
     if (hitTarget) {
+      const evaluatedCandles = entryIndex + 1 + offset + 1;
+      const exitIndex = entryIndex + 1 + offset;
+      const pricePath = includePricePath
+        ? buildEvaluatedPricePath(future.slice(0, exitIndex + 1), plan, candidate.tradeDirection, entryIndex)
+        : undefined;
+
       return completedResult(
         plan,
         startTimestamp,
@@ -214,16 +249,26 @@ export function evaluateOutcome(
         Math.abs(plan.targetPrice - plan.entryPrice) / plan.riskDistance,
         mfe,
         mae,
-        entryIndex + 1 + offset + 1
+        evaluatedCandles,
+        entryIndex,
+        exitIndex,
+        pricePath
       );
     }
   }
 
   if (barsAfterEntry.length >= plan.maxHoldBars) {
-    const exitCandle = barsAfterEntry[plan.maxHoldBars - 1];
+    const exitOffset = plan.maxHoldBars - 1;
+    const exitCandle = barsAfterEntry[exitOffset];
     const directionalMove = candidate.tradeDirection === 'long'
       ? exitCandle.close - plan.entryPrice
       : plan.entryPrice - exitCandle.close;
+    const evaluatedCandles = entryIndex + 1 + plan.maxHoldBars;
+    const exitIndex = entryIndex + 1 + exitOffset;
+    const pricePath = includePricePath
+      ? buildEvaluatedPricePath(future.slice(0, exitIndex + 1), plan, candidate.tradeDirection, entryIndex)
+      : undefined;
+
     return completedResult(
       plan,
       startTimestamp,
@@ -243,7 +288,10 @@ export function evaluateOutcome(
       directionalMove / plan.riskDistance,
       mfe,
       mae,
-      entryIndex + 1 + plan.maxHoldBars
+      evaluatedCandles,
+      entryIndex,
+      exitIndex,
+      pricePath
     );
   }
 
@@ -257,6 +305,10 @@ export function evaluateOutcome(
     rrAchieved: null,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    holdingBars: barsAfterEntry.length,
+    calendarDurationMs: barsAfterEntry.length > 0
+      ? barsAfterEntry[barsAfterEntry.length - 1].timestamp - entryCandle.timestamp
+      : 0,
     evaluation: null,
   };
 }
@@ -362,6 +414,48 @@ function normalizeFutureCandles(candles: readonly Candle[], startTimestamp: numb
     .sort((a, b) => a.timestamp - b.timestamp);
 }
 
+function buildEvaluatedPricePath(
+  candles: readonly Candle[],
+  plan: OutcomeEvaluationPlan,
+  tradeDirection: 'long' | 'short',
+  entryIndex: number
+): EvaluatedCandlePathPoint[] {
+  let runningMfe = 0;
+  let runningMae = 0;
+
+  return candles.map((candle, index) => {
+    let barsSinceEntry: number | null = null;
+    if (entryIndex >= 0 && index >= entryIndex) {
+      barsSinceEntry = index - entryIndex;
+      if (index > entryIndex) {
+        const favorable = tradeDirection === 'long'
+          ? Math.max(0, candle.high - plan.entryPrice)
+          : Math.max(0, plan.entryPrice - candle.low);
+        const adverse = tradeDirection === 'long'
+          ? Math.max(0, plan.entryPrice - candle.low)
+          : Math.max(0, candle.high - plan.entryPrice);
+        runningMfe = Math.max(runningMfe, favorable);
+        runningMae = Math.max(runningMae, adverse);
+      }
+    }
+
+    return Object.freeze({
+      timestamp: candle.timestamp,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      barsSinceObservation: index + 1,
+      barsSinceEntry,
+      distanceToEntry: Math.abs(candle.close - plan.entryPrice),
+      distanceToStop: Math.abs(candle.close - plan.stopPrice),
+      distanceToTarget: Math.abs(candle.close - plan.targetPrice),
+      mfe: runningMfe,
+      mae: runningMae,
+    });
+  });
+}
+
 function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
   return {
     status: 'WAITING_ENTRY',
@@ -373,6 +467,8 @@ function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
     rrAchieved: null,
     maximumFavorableExcursion: null,
     maximumAdverseExcursion: null,
+    holdingBars: null,
+    calendarDurationMs: null,
     evaluation: null,
   };
 }
@@ -388,14 +484,27 @@ function completedResult(
   rrAchieved: number | null,
   mfe: number | null,
   mae: number | null,
-  evaluatedCandles: number
+  evaluatedCandles: number,
+  entryIndex?: number,
+  exitIndex?: number,
+  pricePath?: readonly EvaluatedCandlePathPoint[]
 ): OutcomeTrackingResult {
+  const holdingBars = entryTriggeredAt !== null && exitIndex !== undefined && entryIndex !== undefined
+    ? Math.max(0, exitIndex - entryIndex)
+    : null;
+  const calendarDurationMs = outcome.timestamp && entryTriggeredAt !== null
+    ? Math.max(0, outcome.timestamp - entryTriggeredAt)
+    : (outcome.timestamp && evaluationStartTimestamp ? Math.max(0, outcome.timestamp - evaluationStartTimestamp) : null);
+
   const evaluation: CompletedSignalOutcomeEvaluationEvidence = {
-    version: 1,
+    version: 2,
+    outcomeEngineVersion: 1,
     entryPrice: evaluationPlan.entryPrice,
     stopPrice: evaluationPlan.stopPrice,
     targetPrice: evaluationPlan.targetPrice,
     riskDistance: evaluationPlan.riskDistance,
+    targetRMultiple: evaluationPlan.targetRMultiple,
+    entryMode: evaluationPlan.entryMode,
     entryWindowBars: evaluationPlan.entryWindowBars,
     maxHoldBars: evaluationPlan.maxHoldBars,
     sameCandleResolution: evaluationPlan.sameCandleResolution,
@@ -403,6 +512,8 @@ function completedResult(
     evaluatedCandles,
     evaluationStartTimestamp,
     evaluationEndTimestamp: outcome.timestamp,
+    holdingBars,
+    calendarDurationMs,
   };
 
   return {
@@ -415,7 +526,10 @@ function completedResult(
     rrAchieved,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    holdingBars,
+    calendarDurationMs,
     evaluation,
+    ...(pricePath ? { pricePath } : {}),
   };
 }
 
