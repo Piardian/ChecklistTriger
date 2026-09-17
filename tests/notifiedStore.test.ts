@@ -31,6 +31,24 @@ describe('Notified POI Store', () => {
     expect(store.hasBeenNotified(key)).toBe(true);
   });
 
+  test('fails closed when durable notification state is corrupt', () => {
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'notified_pois.json'), '{ invalid json', 'utf8');
+    const store = new NotifiedStore(testDir);
+
+    expect(() => store.hasBeenNotified('some_key')).toThrow(/Failed to read/);
+    expect(() => store.markAsNotified('new_key')).toThrow(/Failed to read/);
+    expect(fs.readFileSync(path.join(testDir, 'notified_pois.json'), 'utf8')).toBe('{ invalid json');
+  });
+
+  test('rejects structurally invalid durable state', () => {
+    fs.mkdirSync(testDir, { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'notified_pois.json'), JSON.stringify({ key: 'value' }), 'utf8');
+    const store = new NotifiedStore(testDir);
+
+    expect(() => store.hasDurablyBeenNotified('key')).toThrow(/valid string-array payload/);
+  });
+
   test('atomically reserves and releases all pending keys', () => {
     const store = new NotifiedStore(testDir);
 
