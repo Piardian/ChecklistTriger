@@ -88,9 +88,9 @@ export function validatePatternsOutOfSample(
 
   for (const pattern of patterns) {
     const group = outOfSampleSegmented.segments[pattern.segment];
-    const segmentBenchmark = group?.[pattern.value]?.benchmark;
+    const segment = group?.[pattern.value];
 
-    if (!segmentBenchmark) {
+    if (!segment) {
       results.push(Object.freeze({
         patternId: pattern.id,
         segment: pattern.segment,
@@ -105,7 +105,7 @@ export function validatePatternsOutOfSample(
       continue;
     }
 
-    const oosSampleSize = group[pattern.value].sampleSize;
+    const oosSampleSize = segment.sampleSize;
     if (oosSampleSize < minimumOosSampleSize) {
       results.push(Object.freeze({
         patternId: pattern.id,
@@ -122,7 +122,7 @@ export function validatePatternsOutOfSample(
     }
 
     const overallValue = getMetricValue(outOfSampleSegmented.overallBenchmark, pattern.metric);
-    const segmentValue = getMetricValue(segmentBenchmark, pattern.metric);
+    const segmentValue = getMetricValue(segment.benchmark, pattern.metric);
     const difference = round(segmentValue - overallValue);
     const preservedDirection = preservesPatternDirection(pattern.type, difference);
 
