@@ -4,6 +4,7 @@ import type { NotificationCandidate } from '../server/pipeline';
 import type { Candle } from './types';
 import type { SignalOutcome } from './signalOutcome';
 import { createSignalOutcome } from './signalOutcome';
+import type { CompletedSignalOutcomeEvaluationEvidence } from './signalEvidence';
 import { getPipSize as getAssetPipSize } from './assetMetrics';
 
 export interface OutcomeEvaluationPlan {
@@ -26,6 +27,7 @@ export interface OutcomeTrackingResult {
   readonly rrAchieved: number | null;
   readonly maximumFavorableExcursion: number | null;
   readonly maximumAdverseExcursion: number | null;
+  readonly evaluation: CompletedSignalOutcomeEvaluationEvidence | null;
 }
 
 export interface OutcomeTrackerOptions {
@@ -111,12 +113,15 @@ export function evaluateOutcome(
 
   if (entryIndex < 0) {
     if (future.length >= plan.entryWindowBars) {
+      const exitCandle = future[plan.entryWindowBars - 1];
       return completedResult(
+        plan,
+        startTimestamp,
         plan,
         createSignalOutcome({
           signalContext: requireSignalContext(candidate),
           outcomeType: 'EXPIRED',
-          timestamp: future[plan.entryWindowBars - 1].timestamp,
+          timestamp: exitCandle.timestamp,
           reason: {
             code: 'ENTRY_WINDOW_EXPIRED',
             message: `Entry was not triggered within ${plan.entryWindowBars} completed 15M candles.`,
@@ -127,7 +132,8 @@ export function evaluateOutcome(
         null,
         null,
         null,
-        null
+        null,
+        plan.entryWindowBars
       );
     }
     return waitingResult(plan);
@@ -164,6 +170,8 @@ export function evaluateOutcome(
     if (hitStop) {
       return completedResult(
         plan,
+        startTimestamp,
+        plan,
         createSignalOutcome({
           signalContext: requireSignalContext(candidate),
           outcomeType: 'STOP_LOSS',
@@ -178,12 +186,15 @@ export function evaluateOutcome(
         plan.stopPrice,
         -1,
         mfe,
-        mae
+        mae,
+        entryIndex + 1 + offset + 1
       );
     }
 
     if (hitTarget) {
       return completedResult(
+        plan,
+        startTimestamp,
         plan,
         createSignalOutcome({
           signalContext: requireSignalContext(candidate),
@@ -199,7 +210,8 @@ export function evaluateOutcome(
         plan.targetPrice,
         Math.abs(plan.targetPrice - plan.entryPrice) / plan.riskDistance,
         mfe,
-        mae
+        mae,
+        entryIndex + 1 + offset + 1
       );
     }
   }
@@ -210,6 +222,8 @@ export function evaluateOutcome(
       ? exitCandle.close - plan.entryPrice
       : plan.entryPrice - exitCandle.close;
     return completedResult(
+      plan,
+      startTimestamp,
       plan,
       createSignalOutcome({
         signalContext: requireSignalContext(candidate),
@@ -225,7 +239,8 @@ export function evaluateOutcome(
       exitCandle.close,
       directionalMove / plan.riskDistance,
       mfe,
-      mae
+      mae,
+      entryIndex + 1 + plan.maxHoldBars
     );
   }
 
@@ -239,6 +254,7 @@ export function evaluateOutcome(
     rrAchieved: null,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    evaluation: null,
   };
 }
 
@@ -349,19 +365,38 @@ function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
     rrAchieved: null,
     maximumFavorableExcursion: null,
     maximumAdverseExcursion: null,
+    evaluation: null,
   };
 }
 
 function completedResult(
   plan: OutcomeEvaluationPlan,
+  evaluationStartTimestamp: number,
+  evaluationPlan: OutcomeEvaluationPlan,
   outcome: SignalOutcome,
   entryTriggeredAt: number | null,
   entryPrice: number | null,
   exitPrice: number | null,
   rrAchieved: number | null,
   mfe: number | null,
-  mae: number | null
+  mae: number | null,
+  evaluatedCandles: number
 ): OutcomeTrackingResult {
+  const evaluation: CompletedSignalOutcomeEvaluationEvidence = {
+    version: 1,
+    entryPrice: evaluationPlan.entryPrice,
+    stopPrice: evaluationPlan.stopPrice,
+    targetPrice: evaluationPlan.targetPrice,
+    riskDistance: evaluationPlan.riskDistance,
+    entryWindowBars: evaluationPlan.entryWindowBars,
+    maxHoldBars: evaluationPlan.maxHoldBars,
+    sameCandleResolution: evaluationPlan.sameCandleResolution,
+    entryTriggeredAt,
+    evaluatedCandles,
+    evaluationStartTimestamp,
+    evaluationEndTimestamp: outcome.timestamp,
+  };
+
   return {
     status: 'COMPLETED',
     outcome,
@@ -372,6 +407,7 @@ function completedResult(
     rrAchieved,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    evaluation,
   };
 }
 
