@@ -17,11 +17,20 @@ function main(): void {
     },
     benchmark: result.segmentedBenchmark,
     learning: result.learningReport,
+    temporalSplit: result.temporalSplit ? {
+      trainFraction: result.temporalSplit.trainFraction,
+      trainSampleSize: result.temporalSplit.train.items.length,
+      outOfSampleSampleSize: result.temporalSplit.outOfSample.items.length,
+      trainCutoffTimestamp: result.temporalSplit.trainCutoffTimestamp,
+    } : null,
+    outOfSampleBenchmark: result.outOfSampleSegmentedBenchmark ?? null,
+    outOfSampleValidation: result.outOfSampleValidation,
   }, null, 2), 'utf8');
 
   console.log(`[HistoricalLearning] wrote ${outputFile}`);
   console.log(`[HistoricalLearning] labeled=${result.dataset.coverage.labeledCount}/${result.dataset.coverage.snapshotCount}`);
   console.log(`[HistoricalLearning] patterns=${result.learningReport.overallLearning.learnedPatterns}`);
+  console.log(`[HistoricalLearning] oos=${result.outOfSampleValidation.status}`);
 }
 
 main();
