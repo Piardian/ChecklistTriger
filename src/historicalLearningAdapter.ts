@@ -76,7 +76,10 @@ function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | 
     grade: record.grade.grade,
     entryAllowed: record.grade.entryAllowed,
     breakdown: record.grade.breakdown,
-    blockReasons: Array.from(record.grade.blockReasons),
+    blockReasons: [...record.grade.blockReasons],
+    ...(record.grade.poiIntegrity ? { poiIntegrity: record.grade.poiIntegrity } : {}),
+    ...(record.grade.liquidityMagnet !== undefined ? { liquidityMagnet: record.grade.liquidityMagnet } : {}),
+    ...(record.grade.opposingObstacle !== undefined ? { opposingObstacle: record.grade.opposingObstacle } : {}),
   };
 
   return {
