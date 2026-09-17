@@ -51,11 +51,15 @@ function main(): void {
     finishedTimestamp: optionalNumber(process.env.REPLAY_FINISHED_TIMESTAMP),
     respectMarketWindow: optionalBoolean(process.env.REPLAY_RESPECT_MARKET_WINDOW, true),
     respectKillzone: optionalBoolean(process.env.REPLAY_RESPECT_KILLZONE, true),
-    outcomeOptions: undefined,
-    onSession: (session: { symbol: Symbol; candidateCount: number }, symbol: Symbol, completed: number, total: number) => {
+    onSession: (
+      session: { replayStepCount: number; candidateCount: number },
+      symbol: Symbol,
+      completed: number,
+      total: number
+    ) => {
       console.log(
         `[HistoricalMarketReplayBatch] ${completed}/${total} ${symbol} ` +
-        `steps=${session.candidateCount >= 0 ? 'done' : 'error'} candidates=${session.candidateCount}`
+        `steps=${session.replayStepCount} candidates=${session.candidateCount}`
       );
     },
   };
@@ -76,7 +80,8 @@ function main(): void {
   console.log('');
   console.log('[HistoricalMarketReplayBatch] ===== SUMMARY =====');
   console.log(`[HistoricalMarketReplayBatch] requested=${symbols.length}`);
-  console.log(`[HistoricalMarketReplayBatch] replayed=${batch.aggregate.symbolsCompleted}`);
+  console.log(`[HistoricalMarketReplayBatch] datasetsLoaded=${datasets.length}`);
+  console.log(`[HistoricalMarketReplayBatch] completed=${batch.aggregate.symbolsCompleted}`);
   console.log(`[HistoricalMarketReplayBatch] inputIssues=${inputIssues.length}`);
   console.log(`[HistoricalMarketReplayBatch] candidates=${batch.aggregate.candidates}`);
   console.log(`[HistoricalMarketReplayBatch] takeProfit=${batch.aggregate.takeProfit}`);
@@ -129,8 +134,7 @@ function isStoredCandle(value: unknown): value is StoredCandle {
     Number.isFinite(candle.open) &&
     Number.isFinite(candle.high) &&
     Number.isFinite(candle.low) &&
-    Number.isFinite(candle.close) &&
-    Number.isFinite(candle.volume);
+    Number.isFinite(candle.close);
 }
 
 function readSymbols(value: string | undefined): ReplaySymbol[] {
