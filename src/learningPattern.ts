@@ -21,6 +21,16 @@ export interface ConfidenceFactors {
   stability: ConfidenceFactorLevel;
 }
 
+export interface StatisticalInterval {
+  method: 'WILSON_BINOMIAL_95';
+  confidenceLevel: 0.95;
+  successCount: number;
+  trialCount: number;
+  estimate: number;
+  lower: number;
+  upper: number;
+}
+
 export interface LearnedPattern {
   id: string;
   type: LearnedPatternType;
@@ -34,6 +44,8 @@ export interface LearnedPattern {
   confidenceFactors: ConfidenceFactors;
   /** Provenance is optional for backwards compatibility; omitted means historical. */
   provenance?: LearningEvidenceProvenance;
+  /** Statistical uncertainty for binary rate metrics. This is not a causal significance test. */
+  statisticalInterval?: StatisticalInterval;
   comparisonEvidence: ComparisonEvidence;
   evidence: {
     observationId: string;
