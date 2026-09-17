@@ -7,6 +7,10 @@ import {
 import { StoredCandle } from './candleStore';
 import { ALL_SYMBOLS, Symbol } from './universe';
 
+const REPLAY_SYMBOLS = [...ALL_SYMBOLS, 'BTCEUR', 'ETHEUR', 'LTCEUR'] as const;
+
+type ReplaySymbol = (typeof REPLAY_SYMBOLS)[number];
+
 function main(): void {
   const symbol = readSymbol(process.env.REPLAY_SYMBOL ?? 'EURUSD');
   const dataset = {
@@ -81,7 +85,7 @@ function isStoredCandle(value: unknown): value is StoredCandle {
 }
 
 function readSymbol(value: string): Symbol {
-  if (!ALL_SYMBOLS.includes(value as Symbol)) {
+  if (!REPLAY_SYMBOLS.includes(value as ReplaySymbol)) {
     throw new Error(`Unsupported REPLAY_SYMBOL: ${value}`);
   }
   return value as Symbol;
