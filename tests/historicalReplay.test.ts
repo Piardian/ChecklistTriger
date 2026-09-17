@@ -33,6 +33,61 @@ describe('Historical Replay Foundation', () => {
     expect(replay.processedSignals.map(signal => signal.sequence)).toEqual([1, 2, 3]);
   });
 
+  it('replays only signals inside the inclusive timestamp range', () => {
+    const repository = createRepository([
+      createContext('SIGNAL_0000', 0),
+      createContext('SIGNAL_1000', 1000),
+      createContext('SIGNAL_2000', 2000),
+      createContext('SIGNAL_3000', 3000),
+    ]);
+
+    const replay = runHistoricalReplay({
+      repository,
+      startedTimestamp: 1000,
+      finishedTimestamp: 2000,
+    });
+
+    expect(replay.signalCount).toBe(2);
+    expect(replay.processedSignals.map(signal => signal.signalId)).toEqual([
+      'SIGNAL_1000',
+      'SIGNAL_2000',
+    ]);
+    expect(replay.duration).toBe(1000);
+  });
+
+  it('supports a single timestamp boundary without replaying signals outside it', () => {
+    const repository = createRepository([
+      createContext('SIGNAL_1000', 1000),
+      createContext('SIGNAL_2000', 2000),
+      createContext('SIGNAL_3000', 3000),
+    ]);
+
+    const replay = runHistoricalReplay({
+      repository,
+      startedTimestamp: 2000,
+    });
+
+    expect(replay.signalCount).toBe(2);
+    expect(replay.processedSignals.map(signal => signal.signalId)).toEqual([
+      'SIGNAL_2000',
+      'SIGNAL_3000',
+    ]);
+  });
+
+  it('rejects an invalid timestamp range', () => {
+    const repository = createRepository([createContext('SIGNAL_A', 1000)]);
+
+    expect(() =>
+      runHistoricalReplay({
+        repository,
+        startedTimestamp: 2000,
+        finishedTimestamp: 1000,
+      })
+    ).toThrow(
+      'Historical replay start timestamp (2000) cannot be after finish timestamp (1000).'
+    );
+  });
+
   it('runs each replayed signal through the Intelligence Pipeline with signal-scoped queries', () => {
     const repository = createRepository([
       createContext('SIGNAL_A', 1000),
