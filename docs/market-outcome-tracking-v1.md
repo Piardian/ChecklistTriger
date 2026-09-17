@@ -15,7 +15,8 @@ For every approved signal:
 - Target: 2R from the research entry.
 - Entry window: 16 completed 15M candles by default.
 - Maximum holding window after entry: 32 completed 15M candles by default.
-- Same-candle ambiguity: STOP_LOSS_FIRST because OHLC data cannot establish the intrabar order of target and stop touches.
+- Entry candle exclusion: the candle that first touches the research entry is used only to establish entry timing; TP/SL and MFE/MAE are evaluated from the next completed 15M candle onward.
+- Same-candle ambiguity: STOP_LOSS_FIRST for post-entry candles because OHLC data cannot establish the intrabar order of target and stop touches.
 
 All parameters can be overridden by `OutcomeTrackerOptions`.
 
@@ -23,12 +24,12 @@ All parameters can be overridden by `OutcomeTrackerOptions`.
 
 The first candle eligible for outcome evaluation must have a timestamp strictly greater than the signal's `validationCloseTimestamp`, then `marketDataTimestamp`, then structure event timestamp.
 
-Therefore the signal's own analysis candle is never reused as future evidence.
+Therefore the signal's own analysis candle is never reused as future evidence. The entry candle is also not used to infer post-entry path-dependent events because OHLC cannot reveal whether the stop or target was reached before or after the entry touch.
 
 ## Terminal Outcomes
 
-- `TAKE_PROFIT`: target was reached before the stop.
-- `STOP_LOSS`: stop was reached before the target.
+- `TAKE_PROFIT`: target was reached before the stop on a post-entry candle.
+- `STOP_LOSS`: stop was reached before the target on a post-entry candle.
 - `EXPIRED`: entry was not reached within the entry window, or the maximum holding window elapsed after entry.
 - `OPEN`: entry was triggered but the maximum holding window has not elapsed and neither terminal level was reached yet.
 - `WAITING_ENTRY`: insufficient future candles exist to determine entry-window expiry.
