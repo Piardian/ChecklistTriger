@@ -68,9 +68,11 @@ export function splitDatasetByTime(
     return outcomeEnd === null || outcomeEnd < boundaryTimestamp;
   });
 
+  const sourceCoverageRate = dataset.sourceCoverageRate ?? dataset.coverage.coverageRate;
+
   return {
-    train: createSubsetDataset(trainItems),
-    outOfSample: createSubsetDataset(outOfSampleItems),
+    train: createSubsetDataset(trainItems, sourceCoverageRate),
+    outOfSample: createSubsetDataset(outOfSampleItems, sourceCoverageRate),
     trainCutoffTimestamp: trainItems.length > 0
       ? trainItems[trainItems.length - 1].snapshot.timestamp
       : rawTrainItems[rawTrainItems.length - 1].snapshot.timestamp,
@@ -186,7 +188,14 @@ export function validatePatternsOutOfSample(
   });
 }
 
-export function createSubsetDataset(items: readonly ValidatedLabeledSignal[]): ValidatedLabeledDataset {
+export function createSubsetDataset(
+  items: readonly ValidatedLabeledSignal[],
+  sourceCoverageRate = items.length === 0 ? 0 : 1
+): ValidatedLabeledDataset {
+  if (!Number.isFinite(sourceCoverageRate) || sourceCoverageRate < 0 || sourceCoverageRate > 1) {
+    throw new Error('sourceCoverageRate must be between 0 and 1.');
+  }
+
   return Object.freeze({
     items: Object.freeze([...items]),
     coverage: Object.freeze({
@@ -195,6 +204,7 @@ export function createSubsetDataset(items: readonly ValidatedLabeledSignal[]): V
       missingOutcomeCount: 0,
       coverageRate: items.length === 0 ? 0 : 1,
     }),
+    sourceCoverageRate,
   });
 }
 
