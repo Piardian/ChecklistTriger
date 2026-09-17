@@ -76,7 +76,25 @@ function checkAllowedSegments(pattern: LearnedPattern, policy: DecisionPolicy): 
 }
 
 function checkMaximumRiskLevel(policy: DecisionPolicy): PolicyCheckResult {
-  return freezeCheck({ check: 'MAXIMUM_RISK_LEVEL', status: 'SKIPPED', severity: 'INFO', expected: policy.maximumRiskLevel, message: policy.maximumRiskLevel ? 'maximumRiskLevel is reserved for a future risk model and is not evaluated in Sprint 7.' : 'No maximum risk level constraint is configured.' });
+  if (!policy.maximumRiskLevel) {
+    return freezeCheck({
+      check: 'MAXIMUM_RISK_LEVEL',
+      status: 'SKIPPED',
+      severity: 'INFO',
+      message: 'No maximum risk level constraint is configured.',
+    });
+  }
+
+  // LearnedPattern currently carries no independently computed risk classification.
+  // Failing closed is safer than pretending that maximumRiskLevel is enforced.
+  return freezeCheck({
+    check: 'MAXIMUM_RISK_LEVEL',
+    status: 'FAIL',
+    severity: 'ERROR',
+    expected: `<= ${policy.maximumRiskLevel}`,
+    actual: 'UNCLASSIFIED',
+    message: 'maximumRiskLevel is configured but cannot be evaluated because the learned pattern has no validated risk classification.',
+  });
 }
 
 function freezeCheck(check: PolicyCheckResult): PolicyCheckResult {
