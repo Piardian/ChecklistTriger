@@ -2,6 +2,8 @@ import { DecisionEvaluation } from './decisionEvaluation';
 
 export const DECISION_REPORT_VERSION = 1 as const;
 
+export type DecisionReportSource = 'HISTORICAL_LEARNING' | 'RUNTIME_CANDIDATE';
+
 export type DecisionWarningType = 'NO_MATCHING_PATTERN' | string;
 
 export interface DecisionWarning {
@@ -14,6 +16,7 @@ export interface DecisionReport {
     readonly decisionReportVersion: typeof DECISION_REPORT_VERSION;
     readonly learningReportVersion: number;
     readonly datasetFingerprint: string;
+    readonly source: DecisionReportSource;
     readonly generatedFromPolicyId: string;
     readonly generatedFromPolicyVersion: number;
   };
