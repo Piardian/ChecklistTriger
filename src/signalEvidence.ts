@@ -131,7 +131,6 @@ export interface SignalEvidenceRecord {
     readonly breakdown: GradeResult['breakdown'];
     readonly blockReasons: readonly string[];
   };
-  /** Full quality snapshot retained for historical learning segmentation. */
   readonly signalQuality?: SignalQualityResult;
   readonly setupAssessmentShadow?: {
     readonly version: SetupAssessment['version'];
@@ -188,6 +187,21 @@ export interface SignalEvidenceRecord {
   };
 }
 
+export interface CompletedSignalOutcomeEvaluationEvidence {
+  readonly version: 1;
+  readonly entryPrice: number;
+  readonly stopPrice: number;
+  readonly targetPrice: number;
+  readonly riskDistance: number;
+  readonly entryWindowBars: number;
+  readonly maxHoldBars: number;
+  readonly sameCandleResolution: 'STOP_LOSS_FIRST';
+  readonly entryTriggeredAt: number | null;
+  readonly evaluatedCandles: number;
+  readonly evaluationStartTimestamp: number;
+  readonly evaluationEndTimestamp: number | null;
+}
+
 export interface CompletedSignalOutcomeEvidence {
   readonly evidenceSchemaVersion: typeof SIGNAL_EVIDENCE_SCHEMA_VERSION;
   readonly signalId: string;
@@ -201,6 +215,7 @@ export interface CompletedSignalOutcomeEvidence {
     readonly exitTimestamp: number;
     readonly exitReason: string;
   };
+  readonly evaluation?: CompletedSignalOutcomeEvaluationEvidence;
 }
 
 export function createSignalEvidenceRecord(
@@ -220,6 +235,7 @@ export function createCompletedSignalOutcomeEvidence(
     appendedAt: input.appendedAt ?? new Date(input.outcome.exitTimestamp).toISOString(),
     signalId: input.signalId,
     outcome: input.outcome,
+    ...(input.evaluation ? { evaluation: input.evaluation } : {}),
   });
 }
 
