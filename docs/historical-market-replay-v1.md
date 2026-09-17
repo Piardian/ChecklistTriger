@@ -50,6 +50,12 @@ Outcome evaluation begins strictly after the candidate's validation-close timest
 
 No forward 1H or 4H candles are exposed to the current step.
 
+## Market-window rule
+
+By default, V1 respects the existing hard market window and killzone configuration using the historical candle timestamp rather than the machine's current clock.
+
+Both controls can be disabled explicitly for research fixtures through `respectMarketWindow` and `respectKillzone`.
+
 ## Duplicate handling
 
 The replay uses an in-memory notification store. A candidate's `uniqueKey` and `dedupeKey` are remembered once discovered so the same POI is not emitted on every subsequent 15M candle.
