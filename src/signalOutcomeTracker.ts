@@ -295,9 +295,7 @@ export class MarketDataOutcomeTracker {
         maxHoldBars: options.maxHoldBars ?? record.plan.maxHoldBars,
       });
       results.push(result);
-      if (result.status === 'COMPLETED') {
-        this.records.delete(signalId);
-      } else {
+      if (result.status !== 'COMPLETED') {
         this.records.set(signalId, {
           ...record,
           entryTriggeredAt: result.entryTriggeredAt,
@@ -309,6 +307,13 @@ export class MarketDataOutcomeTracker {
     }
     this.persist();
     return results;
+  }
+
+  acknowledgeCompleted(signalId: string): boolean {
+    if (!this.records.has(signalId)) return false;
+    this.records.delete(signalId);
+    this.persist();
+    return true;
   }
 
   has(signalId: string): boolean {
