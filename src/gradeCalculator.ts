@@ -25,7 +25,7 @@ export interface GradeResult {
   totalScore: number;
   grade: 'A+' | 'A' | 'B+' | 'B' | 'C';
   entryAllowed: boolean;
-  blockReasons: string[];
+  blockReasons: readonly string[];
   breakdown: {
     htfBiasPD: number;
     displacement: number;
