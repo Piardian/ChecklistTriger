@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import { calibrateDecision } from '../src/decisionCalibration';
 import { GradeResult } from '../src/gradeCalculator';
 import { generateRuntimeDecisionReport } from '../src/runtimeDecisionEvaluator';
@@ -42,7 +41,7 @@ function calibrationFor(entryAllowed: boolean, blockReasons: string[]) {
 }
 
 describe('generateRuntimeDecisionReport', () => {
-  it('does not create a historical learning pattern or synthetic TPRate', () => {
+  test('does not create a historical learning pattern or synthetic TPRate', () => {
     const calibration = calibrationFor(true, []);
     const report = generateRuntimeDecisionReport({
       candidateId: 'candidate-1',
@@ -62,7 +61,7 @@ describe('generateRuntimeDecisionReport', () => {
     expect(report.decisions[0].policyResults.checks[0].check).toBe('RUNTIME_CANDIDATE_ADMISSION');
   });
 
-  it('blocks a runtime candidate when grade admission is false', () => {
+  test('blocks a runtime candidate when grade admission is false', () => {
     const blockReasons = ['4H bias is not directional or conflicts with the trade'];
     const calibration = calibrationFor(false, blockReasons);
     const report = generateRuntimeDecisionReport({
