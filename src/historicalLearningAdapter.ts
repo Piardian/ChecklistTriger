@@ -81,7 +81,10 @@ function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | 
       relatedEventTimestamp: record.structure.eventTimestamp,
     },
     signalQuality: record.signalQuality,
-    grade: record.grade,
+    grade: {
+      ...record.grade,
+      blockReasons: [...record.grade.blockReasons],
+    },
     engine: { signalQualityVersion: SIGNAL_QUALITY_RESULT_VERSION, gradeVersion: GRADE_ENGINE_VERSION },
   };
 }
