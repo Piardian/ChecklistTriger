@@ -69,7 +69,6 @@ function outcome(signalId: string, timestamp: number, type: 'TP' | 'SL') {
 }
 
 test('builds a validated dataset from matched signal and outcome evidence', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'checklist-learning-'));
   const signalsFile = writeFixture([signal('S1', 1700000000000, 'A'), signal('S2', 1700000900000, 'A+')]);
   const outcomesFile = writeFixture([outcome('S1', 1700001800000, 'TP')]);
   try {
@@ -83,21 +82,27 @@ test('builds a validated dataset from matched signal and outcome evidence', () =
     expect(result.dataset.coverage.missingOutcomeCount).toBe(1);
     expect(result.dataset.coverage.coverageRate).toBe(0.5);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
     fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
   }
 });
 
-test('historical learning report is generated from evidence rather than runtime grade math', () => {
-  const signalsFile = writeFixture([signal('S1', 1700000000000, 'A'), signal('S2', 1700000900000, 'A+')]);
-  const outcomesFile = writeFixture([outcome('S1', 1700001800000, 'TP'), outcome('S2', 1700002700000, 'SL')]);
+test('historical learning uses an ordered train split and exposes a separate OOS validation report', () => {
+  const base = 1700000000000;
+  const signals = Array.from({ length: 40 }, (_, index) => signal(`S${index + 1}`, base + index * 900000, index % 2 === 0 ? 'A' : 'A+'));
+  const outcomes = signals.map((item, index) => outcome(item.metadata.signalId, base + index * 900000 + 1800000, index % 2 === 0 ? 'TP' : 'SL'));
+  const signalsFile = writeFixture(signals);
+  const outcomesFile = writeFixture(outcomes);
   try {
     const result = generateHistoricalLearningReport({ signalsFile, outcomesFile });
-    expect(result.dataset.items).toHaveLength(2);
-    expect(result.segmentedBenchmark.metadata.datasetFingerprint).not.toMatch(/^runtime:/);
+    expect(result.dataset.items).toHaveLength(40);
+    expect(result.temporalSplit).toBeDefined();
+    expect(result.temporalSplit?.train.items).toHaveLength(28);
+    expect(result.temporalSplit?.outOfSample.items).toHaveLength(12);
+    expect(result.temporalSplit?.trainCutoffTimestamp).toBe(result.temporalSplit?.train.items.at(-1)?.snapshot.timestamp);
     expect(result.learningReport.metadata.datasetFingerprint).toBe(result.segmentedBenchmark.metadata.datasetFingerprint);
-    expect(result.learningReport.overallLearning.learnedPatterns).toBe(0);
+    expect(result.outOfSampleSegmentedBenchmark).toBeDefined();
+    expect(result.outOfSampleValidation.outOfSampleSampleSize).toBe(12);
   } finally {
     fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
     fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
