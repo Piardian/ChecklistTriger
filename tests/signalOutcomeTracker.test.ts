@@ -104,10 +104,25 @@ describe('Market data outcome tracker', () => {
     expect(result.rrAchieved).toBeCloseTo(2, 5);
   });
 
-  test('records stop loss before target when one OHLC candle touches both levels', () => {
+  test('does not use the entry candle itself for stop or target resolution', () => {
     const candidate = buildCandidate();
     const future = [
       candle(20000, 1.105, 1.116, 1.099, 1.108),
+      candle(920000, 1.108, 1.11, 1.106, 1.109),
+    ];
+
+    const result = evaluateOutcome(candidate, future, { entryWindowBars: 4, maxHoldBars: 8 });
+
+    expect(result.status).toBe('OPEN');
+    expect(result.outcome).toBeNull();
+    expect(result.entryTriggeredAt).toBe(20000);
+  });
+
+  test('records stop loss before target when one post-entry OHLC candle touches both levels', () => {
+    const candidate = buildCandidate();
+    const future = [
+      candle(20000, 1.105, 1.106, 1.104, 1.105),
+      candle(920000, 1.105, 1.116, 1.099, 1.108),
     ];
 
     const result = evaluateOutcome(candidate, future, { entryWindowBars: 4, maxHoldBars: 8 });
