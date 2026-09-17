@@ -136,7 +136,10 @@ export function evaluateOutcome(
   const entryCandle = future[entryIndex];
   let mfe = 0;
   let mae = 0;
-  const barsAfterEntry = future.slice(entryIndex);
+  // The entry candle establishes the first touch of the entry price, but its
+  // OHLC does not reveal what happened before versus after that touch. Exclude
+  // it from TP/SL evaluation and excursion measurement to avoid look-ahead.
+  const barsAfterEntry = future.slice(entryIndex + 1);
 
   for (let offset = 0; offset < Math.min(plan.maxHoldBars, barsAfterEntry.length); offset += 1) {
     const candle = barsAfterEntry[offset];
@@ -156,7 +159,7 @@ export function evaluateOutcome(
       ? candle.high >= plan.targetPrice
       : candle.low <= plan.targetPrice;
 
-    // OHLC cannot reveal which level was hit first inside a single candle.
+    // OHLC cannot reveal which level was hit first inside a single post-entry candle.
     // Resolve this ambiguity deterministically and conservatively as STOP_LOSS_FIRST.
     if (hitStop) {
       return completedResult(
