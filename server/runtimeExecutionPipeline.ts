@@ -1,5 +1,3 @@
-import { generateDecisionReport } from '../src/decisionEngine';
-import { createDecisionPolicy } from '../src/decisionPolicy';
 import { generateExecutionPlan } from '../src/executionPlanner';
 import { createExecutionPlanningPolicy } from '../src/executionPlanningPolicy';
 import { createExecutionRuntimePolicy } from '../src/executionRuntimePolicy';
@@ -14,10 +12,9 @@ import { createSimulationExecutionPolicy } from '../src/simulationExecutionPolic
 import { simulateExecution } from '../src/simulationExecutionManager';
 import { createRiskPolicy } from '../src/riskPolicy';
 import { evaluateRisk } from '../src/riskEngineManager';
-import { applyDecisionCalibration, calibrateDecision, DecisionCalibrationResult } from '../src/decisionCalibration';
-import { LearningReport, LEARNING_REPORT_VERSION } from '../src/learningReport';
-import { BENCHMARK_REPORT_VERSION } from '../src/benchmarkReport';
-import { SEGMENTED_BENCHMARK_REPORT_VERSION } from '../src/segmentedBenchmarkReport';
+import { calibrateDecision, DecisionCalibrationResult } from '../src/decisionCalibration';
+import { generateRuntimeDecisionReport } from '../src/runtimeDecisionEvaluator';
+import { DecisionReport } from '../src/decisionReport';
 import { SignalContext, createSignalContext } from '../src/signalContext';
 import { SignalLifecycleState } from '../src/signalLifecycle';
 import { SignalOutcome, createWaitingEntryOutcome } from '../src/signalOutcome';
@@ -27,7 +24,7 @@ import { defaultMarketDataOutcomeTracker } from '../src/signalOutcomeTracker';
 import { NotificationCandidate } from './pipeline';
 
 export interface RuntimeExecutionPipelineResult {
-  readonly decisionReport: ReturnType<typeof generateDecisionReport>;
+  readonly decisionReport: DecisionReport;
   readonly executionPlan: ReturnType<typeof generateExecutionPlan>;
   readonly runtimeResult: ReturnType<typeof executePlan>;
   readonly sessionResult: ReturnType<typeof createExecutionSession>;
@@ -46,17 +43,6 @@ export function runRuntimeExecutionPipeline(
   repository: SignalRepository = new NoopSignalRepository()
 ): RuntimeExecutionPipelineResult {
   const candidateId = sanitizeId(candidate.signalId ?? candidate.uniqueKey);
-  const learningReport = createRuntimeLearningReport(candidate, candidateId);
-  const decisionPolicy = createDecisionPolicy({
-    policyId: `runtime-decision-policy:${candidateId}`,
-    name: 'Runtime Decision Policy',
-    minimumSampleSize: 1,
-    minimumCoverage: 0,
-    minimumConfidence: 'LOW',
-    allowedPatternTypes: ['PERFORMANCE_ADVANTAGE'],
-    requiredMetrics: ['TPRate'],
-    allowedSegments: ['grade'],
-  });
   const decisionCalibration = calibrateDecision({
     tradeDirection: candidate.tradeDirection,
     bias4H: candidate.bias4H,
@@ -71,10 +57,14 @@ export function runRuntimeExecutionPipeline(
     blockReasons: candidate.gradeResult.blockReasons,
     breakdown: candidate.gradeResult.breakdown,
   });
-  const decisionReport = applyDecisionCalibration(
-    generateDecisionReport(learningReport, decisionPolicy),
-    decisionCalibration
-  );
+  const decisionReport = generateRuntimeDecisionReport({
+    candidateId,
+    gradeResult: candidate.gradeResult,
+    calibration: decisionCalibration,
+    policyId: `runtime-admission-policy:${candidateId}`,
+    policyName: 'Runtime Candidate Admission',
+    policyVersion: 1,
+  });
 
   const executionPlan = generateExecutionPlan(decisionReport, createExecutionPlanningPolicy({
     planningId: `runtime-planning:${candidateId}`,
@@ -172,93 +162,6 @@ export function runRuntimeExecutionPipeline(
     signalOutcome,
     signalBenchmark,
     decisionCalibration,
-  });
-}
-
-function createRuntimeLearningReport(candidate: NotificationCandidate, candidateId: string): LearningReport {
-  const datasetFingerprint = `runtime:${candidateId}`;
-  const observationId = `runtime-observation:${candidateId}`;
-  const patternId = `runtime-pattern:${candidateId}`;
-  const tpRate = Math.max(0, Math.min(1, candidate.gradeResult.totalScore / 9));
-  const slRate = 1 - tpRate;
-  const sampleSize = 1;
-  const coverage = 1;
-  const benchmarkReference = Object.freeze({
-    datasetFingerprint,
-    benchmarkVersion: BENCHMARK_REPORT_VERSION,
-    segmentedBenchmarkVersion: SEGMENTED_BENCHMARK_REPORT_VERSION,
-  });
-  const comparisonEvidence = Object.freeze({
-    metric: 'TPRate' as const,
-    segment: Object.freeze({ label: `Grade ${candidate.gradeResult.grade}`, value: tpRate }),
-    baseline: Object.freeze({ label: 'overall' as const, value: 0 }),
-    difference: tpRate,
-    relativeDifference: tpRate,
-  });
-  const counts = Object.freeze({ TP: tpRate, SL: slRate, BE: 0, EXPIRED: 0, UNKNOWN: 0 });
-  const rates = Object.freeze({ TPRate: tpRate, SLRate: slRate, BERate: 0, EXPIREDRate: 0, UNKNOWNRate: 0 });
-  const duration = Object.freeze({ averageEvaluationBars: 0, medianEvaluationBars: 0 });
-  const excursion = Object.freeze({ averageMFE: 0, averageMAE: 0 });
-  const observation = Object.freeze({
-    id: observationId,
-    segment: 'grade' as const,
-    value: candidate.gradeResult.grade,
-    metric: 'TPRate' as const,
-    direction: 'ABOVE_BASELINE' as const,
-    sampleSize,
-    coverage,
-    comparisonEvidence,
-    benchmarkReference,
-    explanation: Object.freeze({
-      because: Object.freeze(['Runtime adapter created a deterministic learning observation from the current detection candidate.']),
-      segmentCoverage: coverage,
-      overallCoverage: coverage,
-      segmentBenchmark: Object.freeze({ counts, rates, duration, excursion }),
-      overallBenchmark: Object.freeze({ counts, rates, duration, excursion }),
-    }),
-    summary: `${candidate.uniqueKey} runtime grade observation.`,
-  });
-
-  const pattern = Object.freeze({
-    id: patternId,
-    type: 'PERFORMANCE_ADVANTAGE' as const,
-    metric: 'TPRate' as const,
-    segment: 'grade' as const,
-    value: candidate.gradeResult.grade,
-    sampleSize,
-    coverage,
-    confidence: 'LOW' as const,
-    confidenceFactors: Object.freeze({ sample: 'LOW' as const, coverage: 'LOW' as const, stability: 'UNKNOWN' as const }),
-    comparisonEvidence,
-    provenance: 'SYNTHETIC_RUNTIME' as const,
-    evidence: Object.freeze({
-      observationId,
-      segmentBenchmark: Object.freeze({ TP: tpRate, SL: slRate, BE: 0, EXPIRED: 0, UNKNOWN: 0, sampleSize, coverage }),
-      overallBenchmark: Object.freeze({ TP: tpRate, SL: slRate, sampleSize, coverage }),
-    }),
-    summary: `${candidate.gradeResult.grade} candidate is available for runtime policy evaluation.`,
-    explanation: Object.freeze({
-      because: Object.freeze(['Runtime candidate evidence is synthetic and must not be treated as historical performance evidence.']),
-      formula: 'runtime_candidate_grade / 9',
-      interpretation: 'DESCRIPTIVE_HISTORICAL_PATTERN' as const,
-    }),
-    benchmarkReference,
-  });
-
-  return Object.freeze({
-    metadata: Object.freeze({
-      learningReportVersion: LEARNING_REPORT_VERSION,
-      benchmarkVersion: BENCHMARK_REPORT_VERSION,
-      segmentedBenchmarkVersion: SEGMENTED_BENCHMARK_REPORT_VERSION,
-      datasetFingerprint,
-      generatedAtDatasetCoverage: coverage,
-      minSampleSize: 30 as const,
-      minCoverageRate: 0.8 as const,
-    }),
-    overallLearning: Object.freeze({ evaluatedSegments: 1, observations: 1, learnedPatterns: 1, skippedSegments: 0 }),
-    observations: Object.freeze([observation]),
-    patterns: Object.freeze([pattern]),
-    warnings: Object.freeze([]),
   });
 }
 
