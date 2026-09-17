@@ -12,7 +12,8 @@
     "test:notify": "ts-node server/testNotify.ts",
     "demo:preview": "ts-node server/demoPreview.ts",
     "nas100:visualization": "ts-node server/nas100Visualization.ts",
-    "learn:historical": "ts-node server/runHistoricalLearning.ts"
+    "learn:historical": "ts-node server/runHistoricalLearning.ts",
+    "replay:market": "ts-node server/runHistoricalMarketReplay.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
