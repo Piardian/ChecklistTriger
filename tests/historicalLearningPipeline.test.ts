@@ -126,12 +126,12 @@ test('validates only out-of-sample effects that preserve direction and minimum e
     `S${index + 1}`,
     base + index * 900000,
     'A',
-    index < 100 ? 'london' : 'new_york'
+    index % 2 === 0 ? 'london' : 'new_york'
   ));
   const outcomes = signals.map((item, index) => outcome(
     item.metadata.signalId,
     base + index * 900000 + 1800000,
-    index < 100 ? 'TP' : 'SL'
+    index % 2 === 0 ? 'TP' : 'SL'
   ));
   const signalsFile = writeFixture(signals);
   const outcomesFile = writeFixture(outcomes);
