@@ -90,8 +90,9 @@ export class CandleStore {
         fs.copyFileSync(tempFilePath, filePath);
         try { fs.unlinkSync(tempFilePath); } catch {}
       }
-    } catch {
-      fs.writeFileSync(filePath, JSON.stringify(candles, null, 2), 'utf8');
+    } catch (error) {
+      try { fs.unlinkSync(tempFilePath); } catch {}
+      throw new Error(`[CandleStore] Failed to persist ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     // Dynamic import avoids a module cycle: outcomeTracker depends on pipeline types,
@@ -107,11 +108,13 @@ export class CandleStore {
 
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      const parsed = JSON.parse(content) as StoredCandle[];
-      return Array.isArray(parsed) ? parsed : [];
+      const parsed: unknown = JSON.parse(content);
+      if (!Array.isArray(parsed) || !parsed.every(isStoredCandle)) {
+        throw new Error('file does not contain a valid candle array');
+      }
+      return parsed;
     } catch (error) {
-      console.warn(`[CandleStore] Failed to read ${filePath}:`, error);
-      return [];
+      throw new Error(`[CandleStore] Failed to read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -162,4 +165,14 @@ function normalizeOutcomeType(
     case 'UNKNOWN': return 'UNKNOWN';
     default: return 'UNKNOWN';
   }
+}
+
+function isStoredCandle(value: unknown): value is StoredCandle {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return Number.isFinite(candidate.timestamp) &&
+    Number.isFinite(candidate.open) &&
+    Number.isFinite(candidate.high) &&
+    Number.isFinite(candidate.low) &&
+    Number.isFinite(candidate.close);
 }
