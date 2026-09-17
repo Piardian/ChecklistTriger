@@ -6,7 +6,7 @@ export class NotifiedStore {
   private pending = new Set<string>();
 
   constructor(dataDir = 'data') {
-    this.dataDir = dataDir;
+    this.dataDir = path.isAbsolute(dataDir) ? dataDir : path.resolve(process.cwd(), dataDir);
   }
 
   private getFilePath(): string {
@@ -19,18 +19,7 @@ export class NotifiedStore {
   }
 
   hasDurablyBeenNotified(uniqueKey: string): boolean {
-    const filePath = this.getFilePath();
-    if (!fs.existsSync(filePath)) {
-      return false;
-    }
-
-    try {
-      const content = fs.readFileSync(filePath, 'utf8');
-      const keys: string[] = JSON.parse(content);
-      return keys.includes(uniqueKey);
-    } catch (e) {
-      return false;
-    }
+    return this.readKeys().includes(uniqueKey);
   }
 
   markPending(uniqueKey: string): void { this.pending.add(uniqueKey); }
@@ -50,16 +39,7 @@ export class NotifiedStore {
     }
 
     const filePath = this.getFilePath();
-    let keys: string[] = [];
-
-    if (fs.existsSync(filePath)) {
-      try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        keys = JSON.parse(content);
-      } catch (e) {
-        keys = [];
-      }
-    }
+    let keys = this.readKeys();
 
     if (!keys.includes(uniqueKey)) {
       keys.push(uniqueKey);
@@ -70,8 +50,7 @@ export class NotifiedStore {
       keys = keys.slice(keys.length - 500);
     }
 
-    // Safe atomic write logic
-    const tempFilePath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 6)}.tmp`;
+    const tempFilePath = `${filePath}.${Date.now()}.${process.pid}.tmp`;
     try {
       fs.writeFileSync(tempFilePath, JSON.stringify(keys, null, 2), 'utf8');
       try {
@@ -80,8 +59,24 @@ export class NotifiedStore {
         fs.copyFileSync(tempFilePath, filePath);
         try { fs.unlinkSync(tempFilePath); } catch {}
       }
-    } catch {
-      fs.writeFileSync(filePath, JSON.stringify(keys, null, 2), 'utf8');
+    } catch (error) {
+      try { fs.unlinkSync(tempFilePath); } catch {}
+      throw new Error(`[NotifiedStore] Failed to persist ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private readKeys(): string[] {
+    const filePath = this.getFilePath();
+    if (!fs.existsSync(filePath)) return [];
+
+    try {
+      const parsed: unknown = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      if (!Array.isArray(parsed) || !parsed.every(value => typeof value === 'string')) {
+        throw new Error('file does not contain a valid string-array payload');
+      }
+      return parsed;
+    } catch (error) {
+      throw new Error(`[NotifiedStore] Failed to read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
