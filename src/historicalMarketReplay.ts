@@ -1,11 +1,8 @@
 import { CandleStore, StoredCandle, Timeframe } from '../server/candleStore';
 import { NotifiedStore } from '../server/notifiedStore';
 import { NotificationCandidate, runPipeline } from '../server/pipeline';
-import {
-  evaluateKillzoneFilter,
-} from '../server/killzone';
+import { evaluateHardMarketWindow, evaluateKillzoneFilter } from '../server/killzone';
 import { Symbol } from '../server/universe';
-import { Candle } from './types';
 import {
   evaluateOutcome,
   OutcomeTrackerOptions,
@@ -96,6 +93,7 @@ export type HistoricalMarketReplayCandidateGenerator = (
 export interface HistoricalMarketReplayOptions {
   readonly startedTimestamp?: number;
   readonly finishedTimestamp?: number;
+  readonly respectMarketWindow?: boolean;
   readonly respectKillzone?: boolean;
   readonly outcomeOptions?: OutcomeTrackerOptions;
   readonly seedSeenKeys?: readonly string[];
@@ -125,7 +123,9 @@ class HistoricalReplayCandleStore extends CandleStore {
             ? this.dataset.candles4h
             : [];
 
-    return source.filter(candle => candle.timestamp <= this.cutoffTimestamp).map(candle => ({ ...candle }));
+    return source
+      .filter(candle => candle.timestamp <= this.cutoffTimestamp)
+      .map(candle => ({ ...candle }));
   }
 }
 
@@ -174,6 +174,7 @@ export function runHistoricalMarketReplay(
   const boundedOutcomeCandles = normalizedDataset.candles15m.filter(
     candle => candle.timestamp <= finishedTimestamp
   );
+  const respectMarketWindow = options.respectMarketWindow ?? true;
   const respectKillzone = options.respectKillzone ?? true;
   const candleStore = new HistoricalReplayCandleStore(normalizedDataset);
   const notifiedStore = new HistoricalReplayNotifiedStore(options.seedSeenKeys);
@@ -185,6 +186,14 @@ export function runHistoricalMarketReplay(
 
   for (const candle of replayCandles) {
     candleStore.setCutoffTimestamp(candle.timestamp);
+
+    if (respectMarketWindow) {
+      const marketWindow = evaluateHardMarketWindow(new Date(candle.timestamp), normalizedDataset.symbol);
+      if (!marketWindow.active) {
+        skippedMarketWindowSteps += 1;
+        continue;
+      }
+    }
 
     if (respectKillzone) {
       const killzone = evaluateKillzoneFilter(new Date(candle.timestamp));
@@ -230,6 +239,7 @@ export function runHistoricalMarketReplay(
       dataset: normalizedDataset,
       startedTimestamp,
       finishedTimestamp,
+      respectMarketWindow,
       respectKillzone,
       outcomeOptions: options.outcomeOptions,
       seedSeenKeys: options.seedSeenKeys ?? [],
@@ -386,6 +396,7 @@ function createReplaySessionId(input: {
   readonly dataset: HistoricalMarketReplayDataset;
   readonly startedTimestamp: number;
   readonly finishedTimestamp: number;
+  readonly respectMarketWindow: boolean;
   readonly respectKillzone: boolean;
   readonly outcomeOptions?: OutcomeTrackerOptions;
   readonly seedSeenKeys: readonly string[];
@@ -398,6 +409,7 @@ function createReplaySessionId(input: {
     candles4h: input.dataset.candles4h,
     startedTimestamp: input.startedTimestamp,
     finishedTimestamp: input.finishedTimestamp,
+    respectMarketWindow: input.respectMarketWindow,
     respectKillzone: input.respectKillzone,
     outcomeOptions: input.outcomeOptions ?? {},
     seedSeenKeys: [...input.seedSeenKeys].sort(),
