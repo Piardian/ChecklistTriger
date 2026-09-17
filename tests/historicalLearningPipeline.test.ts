@@ -101,8 +101,8 @@ test('historical learning uses an ordered and purged train split with separate O
     expect(result.temporalSplit?.purgedTrainCount).toBe(2);
     expect(result.temporalSplit?.train.items).toHaveLength(26);
     expect(result.temporalSplit?.outOfSample.items).toHaveLength(12);
-    expect(result.temporalSplit?.trainCutoffTimestamp).toBe(result.temporalSplit?.train.items.at(-1)?.snapshot.timestamp);
-    expect(result.temporalSplit?.train.items.at(-1)?.outcome.metadata.endTimestamp).toBeLessThan(
+    expect(result.temporalSplit?.trainCutoffTimestamp).toBe(result.temporalSplit?.train.items[result.temporalSplit.train.items.length - 1].snapshot.timestamp);
+    expect(result.temporalSplit?.train.items[result.temporalSplit.train.items.length - 1].outcome.metadata.endTimestamp).toBeLessThan(
       Date.parse(result.temporalSplit?.outOfSampleStartTimestamp ?? '')
     );
     expect(result.learningReport.metadata.datasetFingerprint).toBe(result.segmentedBenchmark.metadata.datasetFingerprint);
@@ -123,6 +123,7 @@ test('preserves low source coverage so learning does not hide incomplete outcome
   const outcomesFile = writeFixture(outcomes);
   try {
     const result = generateHistoricalLearningReport({ signalsFile, outcomesFile });
+    expect(result.dataset.items).toHaveLength(30);
     expect(result.dataset.coverage.coverageRate).toBe(0.75);
     expect(result.learningReport.metadata.generatedAtDatasetCoverage).toBe(0.75);
     expect(result.learningReport.patterns).toHaveLength(0);
