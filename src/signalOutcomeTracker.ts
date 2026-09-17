@@ -36,6 +36,7 @@ export interface OutcomeTrackerOptions {
   readonly invalidationBufferPips?: number;
   readonly targetRMultiple?: number;
   readonly stateFile?: string;
+  readonly entryMode?: 'midpoint' | 'zone_touch';
 }
 
 interface PersistedTrackedSignal {
@@ -62,7 +63,9 @@ export function buildResearchOutcomePlan(
   const invalidationBufferPips = positiveNumber(options.invalidationBufferPips, DEFAULT_INVALIDATION_BUFFER_PIPS);
   const targetRMultiple = positiveNumber(options.targetRMultiple, DEFAULT_TARGET_R_MULTIPLE);
   const zone = resolveZone(candidate);
-  const entryPrice = (zone.low + zone.high) / 2;
+  const entryPrice = options.entryMode === 'zone_touch'
+    ? (candidate.tradeDirection === 'long' ? zone.high : zone.low)
+    : (zone.low + zone.high) / 2;
   const pipSize = getAssetPipSize(candidate.symbol);
   const invalidationBuffer = invalidationBufferPips * pipSize;
 
