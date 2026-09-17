@@ -6,6 +6,8 @@ import {
 } from './historicalMarketReplay';
 import { Symbol, universeCohort } from '../server/universe';
 
+export { HistoricalMarketReplayDataset } from './historicalMarketReplay';
+
 export const HISTORICAL_MARKET_REPLAY_BATCH_VERSION = 1 as const;
 
 export interface HistoricalMarketReplayBatchDataset {
