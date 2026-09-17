@@ -19,9 +19,8 @@ const PIP_SIZE = 0.0001;
 export function labelOutcome(input: OutcomeLabelInput): OutcomeResult {
   const { snapshot, futureCandles, config } = input;
   const evaluationWindow = futureCandles.slice(0, Math.max(0, config.expiryBars));
-  const resolvedEntryPrice = snapshot.candidate.currentPrice;
 
-  if (resolvedEntryPrice === null) {
+  if (snapshot.candidate.currentPrice === null) {
     const startTimestamp = Date.parse(snapshot.timestamp);
     return buildOutcome({
       snapshot,
@@ -38,7 +37,7 @@ export function labelOutcome(input: OutcomeLabelInput): OutcomeResult {
     });
   }
 
-  const entryPrice = resolvedEntryPrice;
+  const entryPrice: number = snapshot.candidate.currentPrice;
   const direction = snapshot.candidate.tradeDirection;
   const levels = resolveLevels(entryPrice, direction, config);
 
