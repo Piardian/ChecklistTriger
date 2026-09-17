@@ -4,6 +4,10 @@ import { SegmentKey } from './segmentDefinitions';
 import { generateSegmentedBenchmark } from './segmentedBenchmark';
 import { ValidatedLabeledDataset, ValidatedLabeledSignal } from './validatedDataset';
 import { BenchmarkReport } from './benchmarkReport';
+import {
+  MIN_RATE_DIFFERENCE,
+  MIN_RELATIVE_DIFFERENCE,
+} from './observationEngine';
 
 export interface TemporalDatasetSplit {
   train: ValidatedLabeledDataset;
@@ -143,20 +147,24 @@ export function validatePatternsOutOfSample(
     const overallValue = getMetricValue(outOfSampleSegmented.overallBenchmark, pattern.metric);
     const segmentValue = getMetricValue(segment.benchmark, pattern.metric);
     const difference = round(segmentValue - overallValue);
-    const preservedDirection = preservesPatternDirection(pattern.type, difference);
+    const preservesDirection = preservesPatternDirection(pattern.type, difference);
+    const meaningfulEffect = isMeaningfulEffect(pattern.metric, difference, overallValue);
+    const validated = preservesDirection && meaningfulEffect;
 
     results.push(Object.freeze({
       patternId: pattern.id,
       segment: pattern.segment,
       value: pattern.value,
       metric: pattern.metric,
-      status: preservedDirection ? 'VALIDATED' : 'FAILED',
+      status: validated ? 'VALIDATED' : 'FAILED',
       trainDifference: pattern.comparisonEvidence.difference,
       outOfSampleDifference: difference,
       outOfSampleSampleSize: oosSampleSize,
-      message: preservedDirection
-        ? 'Out-of-sample segment preserved the direction of the historical pattern.'
-        : 'Out-of-sample segment did not preserve the direction of the historical pattern.',
+      message: validated
+        ? 'Out-of-sample segment preserved the historical direction with a meaningful effect size.'
+        : preservesDirection
+          ? 'Out-of-sample segment preserved direction, but the effect size is below the minimum research threshold.'
+          : 'Out-of-sample segment did not preserve the direction of the historical pattern.',
     }));
   }
 
@@ -232,6 +240,15 @@ function preservesPatternDirection(type: LearnedPattern['type'], difference: num
     case 'STABILITY_SIGNAL':
       return true;
   }
+}
+
+function isMeaningfulEffect(metric: LearningMetric, difference: number, baseline: number): boolean {
+  if (metric === 'TPRate' || metric === 'SLRate') {
+    return Math.abs(difference) >= MIN_RATE_DIFFERENCE;
+  }
+
+  if (baseline === 0) return Math.abs(difference) >= MIN_RELATIVE_DIFFERENCE;
+  return Math.abs(difference / Math.abs(baseline)) >= MIN_RELATIVE_DIFFERENCE;
 }
 
 function round(value: number): number {
