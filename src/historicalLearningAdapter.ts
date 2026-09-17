@@ -4,12 +4,13 @@ import { CompletedSignalOutcomeEvidence, SignalEvidenceRecord } from './signalEv
 import { GRADE_ENGINE_VERSION, SIGNAL_INTELLIGENCE_SNAPSHOT_VERSION, SignalIntelligenceSnapshot } from './signalIntelligenceSnapshot';
 import { GradeResult } from './gradeCalculator';
 import { SIGNAL_QUALITY_RESULT_VERSION } from './signalQualityEngine';
-import { OutcomeResult } from './outcomeResult';
+import { OutcomeResult, OUTCOME_LABELING_CONFIG_VERSION, OUTCOME_RESULT_VERSION } from './outcomeResult';
 import { ValidatedLabeledDataset, createValidatedDataset } from './validatedDataset';
 import { DatasetCoverage, createValidationReport, ValidationReport } from './validationReport';
 import { ALL_SYMBOLS, Symbol } from '../server/universe';
 
 const SUPPORTED_SYMBOLS: readonly string[] = [...ALL_SYMBOLS, 'BTCEUR', 'ETHEUR', 'LTCEUR'];
+const BAR_DURATION_MS = 15 * 60 * 1000;
 
 export interface HistoricalLearningAdapterOptions { signalsFile?: string; outcomesFile?: string; }
 export interface HistoricalLearningReadError { file: 'signals' | 'outcomes'; line: number; message: string; }
@@ -105,31 +106,44 @@ function toOutcomeResult(evidence: CompletedSignalOutcomeEvidence, snapshot: Sig
   // has no equivalent. Exclude them instead of mislabelling them as insufficient data.
   if (evidence.outcome.type === 'MANUAL' || evidence.outcome.type === 'CANCELLED') return null;
 
-  const startTimestamp = new Date(snapshot.timestamp).getTime();
-  const endTimestamp = evidence.outcome.exitTimestamp;
-  if (!Number.isFinite(startTimestamp) || endTimestamp < startTimestamp) return null;
-  const durationMs = evidence.outcome.holdingTimeMs ?? Math.max(0, endTimestamp - startTimestamp);
-  const durationBars = Math.max(0, Math.round(durationMs / (15 * 60 * 1000)));
+  const evaluation = evidence.evaluation;
+  if (evaluation && evaluation.version !== 1) return null;
+
+  const fallbackStartTimestamp = new Date(snapshot.timestamp).getTime();
+  const startTimestamp = evaluation?.evaluationStartTimestamp ?? fallbackStartTimestamp;
+  const endTimestamp = evaluation?.evaluationEndTimestamp ?? evidence.outcome.exitTimestamp;
+  if (!Number.isFinite(startTimestamp) || !Number.isFinite(endTimestamp) || endTimestamp < startTimestamp) return null;
+
+  const fallbackDurationMs = evidence.outcome.holdingTimeMs ?? Math.max(0, endTimestamp - startTimestamp);
+  const fallbackDurationBars = Math.max(0, Math.round(fallbackDurationMs / BAR_DURATION_MS));
+  const evaluatedCandles = evaluation?.evaluatedCandles ?? fallbackDurationBars;
+  if (!Number.isFinite(evaluatedCandles) || evaluatedCandles < 0) return null;
+
+  const entryTriggeredAt = evaluation?.entryTriggeredAt ?? null;
+  const evaluationDurationBars = entryTriggeredAt === null
+    ? evaluatedCandles
+    : Math.max(0, Math.round((endTimestamp - entryTriggeredAt) / BAR_DURATION_MS));
+
   const status: OutcomeResult['outcomeStatus'] = ['TP', 'SL', 'BE', 'EXPIRED', 'UNKNOWN'].includes(evidence.outcome.type)
     ? evidence.outcome.type as OutcomeResult['outcomeStatus']
     : 'UNKNOWN';
   return {
-    outcomeVersion: 1,
+    outcomeVersion: OUTCOME_RESULT_VERSION,
     candidateId: evidence.signalId,
     labeledAt: evidence.appendedAt,
     outcomeStatus: status,
     completionReason: completionReasonFor(status),
     reason: { reasonCode: reasonCodeFor(status), reasonMessage: evidence.outcome.exitReason },
     metadata: {
-      labelingConfigVersion: 1,
-      evaluatedCandles: durationBars,
+      labelingConfigVersion: OUTCOME_LABELING_CONFIG_VERSION,
+      evaluatedCandles,
       startTimestamp,
       endTimestamp,
       resolvedAtTimestamp: endTimestamp,
-      resolvedAtIndex: durationBars,
+      resolvedAtIndex: evaluation?.entryTriggeredAt === null ? null : evaluationDurationBars,
       maxFavorableExcursionPips: evidence.outcome.maximumFavorableExcursion ?? 0,
       maxAdverseExcursionPips: evidence.outcome.maximumAdverseExcursion ?? 0,
-      evaluationDurationBars: durationBars,
+      evaluationDurationBars,
       evaluationCompleted: true,
     },
   };
