@@ -1,4 +1,5 @@
 import { calculateConfidence } from './confidenceCalculator';
+import { calculateWilsonInterval } from './binomialInterval';
 import { LearnedPattern, LearnedPatternType } from './learningPattern';
 import { LearningObservation } from './learningObservation';
 
@@ -13,6 +14,7 @@ function toPattern(observation: LearningObservation): LearnedPattern {
   });
 
   const type = patternTypeFor(observation);
+  const statisticalInterval = binaryIntervalFor(observation);
 
   return Object.freeze({
     id: `pattern:${observation.id}`,
@@ -25,6 +27,7 @@ function toPattern(observation: LearningObservation): LearnedPattern {
     confidence,
     confidenceMethod,
     confidenceFactors: Object.freeze(confidenceFactors),
+    statisticalInterval,
     comparisonEvidence: observation.comparisonEvidence,
     evidence: Object.freeze({
       observationId: observation.id,
@@ -52,6 +55,24 @@ function toPattern(observation: LearningObservation): LearnedPattern {
     }),
     benchmarkReference: observation.benchmarkReference,
   });
+}
+
+function binaryIntervalFor(observation: LearningObservation) {
+  if (observation.metric === 'TPRate') {
+    return calculateWilsonInterval(
+      observation.explanation.segmentBenchmark.counts.TP,
+      observation.sampleSize
+    );
+  }
+
+  if (observation.metric === 'SLRate') {
+    return calculateWilsonInterval(
+      observation.explanation.segmentBenchmark.counts.SL,
+      observation.sampleSize
+    );
+  }
+
+  return undefined;
 }
 
 function patternTypeFor(observation: LearningObservation): LearnedPatternType {
