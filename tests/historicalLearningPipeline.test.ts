@@ -106,8 +106,27 @@ test('historical learning uses an ordered and purged train split with separate O
       Date.parse(result.temporalSplit?.outOfSampleStartTimestamp ?? '')
     );
     expect(result.learningReport.metadata.datasetFingerprint).toBe(result.segmentedBenchmark.metadata.datasetFingerprint);
-    expect(result.outOfSampleSegmentedBenchmark).toBeDefined();
+    expect(result.learningReport.metadata.generatedAtDatasetCoverage).toBe(1);
+    expect(result.outOfSampleSegmentedBenchmark?.metadata.generatedAtDatasetCoverage).toBe(1);
     expect(result.outOfSampleValidation.outOfSampleSampleSize).toBe(12);
+  } finally {
+    fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
+    fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
+  }
+});
+
+test('preserves low source coverage so learning does not hide incomplete outcomes', () => {
+  const base = 1700000000000;
+  const signals = Array.from({ length: 40 }, (_, index) => signal(`S${index + 1}`, base + index * 900000, 'A'));
+  const outcomes = signals.slice(0, 30).map((item, index) => outcome(item.metadata.signalId, base + index * 900000 + 1800000, 'TP'));
+  const signalsFile = writeFixture(signals);
+  const outcomesFile = writeFixture(outcomes);
+  try {
+    const result = generateHistoricalLearningReport({ signalsFile, outcomesFile });
+    expect(result.dataset.coverage.coverageRate).toBe(0.75);
+    expect(result.learningReport.metadata.generatedAtDatasetCoverage).toBe(0.75);
+    expect(result.learningReport.patterns).toHaveLength(0);
+    expect(result.learningReport.warnings[0].type).toBe('LOW_COVERAGE');
   } finally {
     fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
     fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
