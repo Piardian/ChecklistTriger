@@ -6,6 +6,9 @@ import { SIGNAL_QUALITY_RESULT_VERSION } from './signalQualityEngine';
 import { OutcomeResult } from './outcomeResult';
 import { ValidatedLabeledDataset, createValidatedDataset } from './validatedDataset';
 import { DatasetCoverage, createValidationReport, ValidationReport } from './validationReport';
+import { ALL_SYMBOLS, Symbol } from '../server/universe';
+
+const SUPPORTED_SYMBOLS: readonly string[] = [...ALL_SYMBOLS, 'BTCEUR', 'ETHEUR', 'LTCEUR'];
 
 export interface HistoricalLearningAdapterOptions { signalsFile?: string; outcomesFile?: string; }
 export interface HistoricalLearningReadError { file: 'signals' | 'outcomes'; line: number; message: string; }
@@ -62,14 +65,14 @@ export function buildHistoricalLearningDataset(options: HistoricalLearningAdapte
 
 function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | null {
   if (record.evidenceSchemaVersion !== 1 || !record.signalQuality) return null;
-  if (!['EURUSD', 'GBPUSD', 'AUDUSD', 'USDCAD'].includes(record.metadata.symbol)) return null;
+  if (!SUPPORTED_SYMBOLS.includes(record.metadata.symbol)) return null;
   if (!['long', 'short'].includes(record.metadata.direction)) return null;
   if (!['OB', 'FVG'].includes(record.poi.poiType)) return null;
   if (!['BOS', 'CHoCH'].includes(record.structure.eventType)) return null;
   return {
     snapshotVersion: SIGNAL_INTELLIGENCE_SNAPSHOT_VERSION,
     timestamp: new Date(record.metadata.timestamp).toISOString(),
-    symbol: record.metadata.symbol,
+    symbol: record.metadata.symbol as Symbol,
     timeframe: '15m',
     candidateId: record.metadata.signalId,
     candidate: {
