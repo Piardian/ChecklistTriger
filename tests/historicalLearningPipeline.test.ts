@@ -51,7 +51,7 @@ function signal(signalId: string, timestamp: number, grade: 'A+' | 'A' = 'A') {
   };
 }
 
-function outcome(signalId: string, timestamp: number, type: 'TP' | 'SL') {
+function outcome(signalId: string, timestamp: number, type: 'TP' | 'SL' | 'MANUAL' | 'CANCELLED') {
   return {
     evidenceSchemaVersion: 1,
     signalId,
@@ -59,11 +59,11 @@ function outcome(signalId: string, timestamp: number, type: 'TP' | 'SL') {
     outcome: {
       type,
       holdingTimeMs: 1800000,
-      rrAchieved: type === 'TP' ? 2 : -1,
+      rrAchieved: type === 'TP' ? 2 : type === 'SL' ? -1 : null,
       maximumFavorableExcursion: type === 'TP' ? 22 : 5,
       maximumAdverseExcursion: type === 'TP' ? 4 : 12,
       exitTimestamp: timestamp,
-      exitReason: type === 'TP' ? 'Target reached.' : 'Stop reached.',
+      exitReason: type === 'TP' ? 'Target reached.' : type === 'SL' ? 'Stop reached.' : `${type} outcome.`,
     },
   };
 }
@@ -108,6 +108,31 @@ test('historical learning uses an ordered and purged train split with separate O
     expect(result.learningReport.metadata.datasetFingerprint).toBe(result.segmentedBenchmark.metadata.datasetFingerprint);
     expect(result.outOfSampleSegmentedBenchmark).toBeDefined();
     expect(result.outOfSampleValidation.outOfSampleSampleSize).toBe(12);
+  } finally {
+    fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
+    fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
+  }
+});
+
+test('excludes manual and cancelled lifecycle outcomes from benchmark learning labels', () => {
+  const base = 1700000000000;
+  const signalsFile = writeFixture([signal('S1', base), signal('S2', base + 900000), signal('S3', base + 1800000)]);
+  const outcomesFile = writeFixture([
+    outcome('S1', base + 1800000, 'MANUAL'),
+    outcome('S2', base + 2700000, 'CANCELLED'),
+    outcome('S3', base + 3600000, 'TP'),
+  ]);
+  try {
+    const result = buildHistoricalLearningDataset({ signalsFile, outcomesFile });
+    expect(result.dataset.items).toHaveLength(1);
+    expect(result.dataset.items[0].candidateId).toBe('S3');
+    expect(result.skippedOutcomeCount).toBe(2);
+    expect(result.dataset.coverage).toEqual({
+      snapshotCount: 3,
+      labeledCount: 1,
+      missingOutcomeCount: 2,
+      coverageRate: 1 / 3,
+    });
   } finally {
     fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
     fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
