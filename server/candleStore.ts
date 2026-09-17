@@ -121,7 +121,7 @@ export class CandleStore {
   private async processOutcomeTracking(symbol: Symbol, candles: readonly StoredCandle[]): Promise<void> {
     try {
       const { defaultMarketDataOutcomeTracker } = await import('../src/signalOutcomeTracker');
-      const { appendCompletedSignalOutcomeEvidenceAsync } = await import('./evidenceRecorder');
+      const { appendCompletedSignalOutcomeEvidenceAsync } = await import('./outcomeEvidenceRecorder');
       const results = defaultMarketDataOutcomeTracker.process(symbol, candles);
 
       for (const result of results) {
@@ -139,6 +139,7 @@ export class CandleStore {
           maximumAdverseExcursion: result.maximumAdverseExcursion,
           exitTimestamp: result.outcome.timestamp,
           exitReason: result.outcome.reason.message,
+          evaluation: result.evaluation,
         });
 
         console.log(
