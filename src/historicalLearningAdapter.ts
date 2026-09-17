@@ -101,12 +101,16 @@ function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | 
 
 function toOutcomeResult(evidence: CompletedSignalOutcomeEvidence, snapshot: SignalIntelligenceSnapshot | undefined): OutcomeResult | null {
   if (!snapshot || evidence.evidenceSchemaVersion !== 1 || !Number.isFinite(evidence.outcome.exitTimestamp)) return null;
+  // MANUAL and CANCELLED are real lifecycle outcomes, but the benchmark's label space
+  // has no equivalent. Exclude them instead of mislabelling them as insufficient data.
+  if (evidence.outcome.type === 'MANUAL' || evidence.outcome.type === 'CANCELLED') return null;
+
   const startTimestamp = new Date(snapshot.timestamp).getTime();
   const endTimestamp = evidence.outcome.exitTimestamp;
   if (!Number.isFinite(startTimestamp) || endTimestamp < startTimestamp) return null;
   const durationMs = evidence.outcome.holdingTimeMs ?? Math.max(0, endTimestamp - startTimestamp);
   const durationBars = Math.max(0, Math.round(durationMs / (15 * 60 * 1000)));
-  const status: OutcomeResult['outcomeStatus'] = ['TP', 'SL', 'BE', 'EXPIRED'].includes(evidence.outcome.type)
+  const status: OutcomeResult['outcomeStatus'] = ['TP', 'SL', 'BE', 'EXPIRED', 'UNKNOWN'].includes(evidence.outcome.type)
     ? evidence.outcome.type as OutcomeResult['outcomeStatus']
     : 'UNKNOWN';
   return {
