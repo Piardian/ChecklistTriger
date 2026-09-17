@@ -93,7 +93,9 @@ function toOutcomeResult(evidence: CompletedSignalOutcomeEvidence, snapshot: Sig
   if (!Number.isFinite(startTimestamp) || endTimestamp < startTimestamp) return null;
   const durationMs = evidence.outcome.holdingTimeMs ?? Math.max(0, endTimestamp - startTimestamp);
   const durationBars = Math.max(0, Math.round(durationMs / (15 * 60 * 1000)));
-  const status = evidence.outcome.type;
+  const status: OutcomeResult['outcomeStatus'] = ['TP', 'SL', 'BE', 'EXPIRED'].includes(evidence.outcome.type)
+    ? evidence.outcome.type as OutcomeResult['outcomeStatus']
+    : 'UNKNOWN';
   return {
     outcomeVersion: 1,
     candidateId: evidence.signalId,
@@ -116,23 +118,23 @@ function toOutcomeResult(evidence: CompletedSignalOutcomeEvidence, snapshot: Sig
   };
 }
 
-function reasonCodeFor(status: CompletedSignalOutcomeEvidence['outcome']['type']): OutcomeResult['reason']['reasonCode'] {
+function reasonCodeFor(status: OutcomeResult['outcomeStatus']): OutcomeResult['reason']['reasonCode'] {
   switch (status) {
     case 'TP': return 'TAKE_PROFIT_LEVEL_REACHED';
     case 'SL': return 'STOP_LOSS_LEVEL_REACHED';
     case 'BE': return 'BREAK_EVEN_LEVEL_REACHED';
     case 'EXPIRED': return 'EXPIRED_WITHOUT_RESOLUTION';
-    case 'MANUAL': case 'CANCELLED': case 'UNKNOWN': return 'INSUFFICIENT_FUTURE_DATA';
+    case 'UNKNOWN': return 'INSUFFICIENT_FUTURE_DATA';
   }
 }
 
-function completionReasonFor(status: CompletedSignalOutcomeEvidence['outcome']['type']): OutcomeResult['completionReason'] {
+function completionReasonFor(status: OutcomeResult['outcomeStatus']): OutcomeResult['completionReason'] {
   switch (status) {
     case 'TP': return 'take_profit_hit';
     case 'SL': return 'stop_loss_hit';
     case 'BE': return 'break_even_reached';
     case 'EXPIRED': return 'expired_without_resolution';
-    case 'MANUAL': case 'CANCELLED': case 'UNKNOWN': return 'insufficient_future_data';
+    case 'UNKNOWN': return 'insufficient_future_data';
   }
 }
 
