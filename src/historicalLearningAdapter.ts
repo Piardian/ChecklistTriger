@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { CompletedSignalOutcomeEvidence, SignalEvidenceRecord } from './signalEvidence';
 import { GRADE_ENGINE_VERSION, SIGNAL_INTELLIGENCE_SNAPSHOT_VERSION, SignalIntelligenceSnapshot } from './signalIntelligenceSnapshot';
+import { GradeResult } from './gradeCalculator';
 import { SIGNAL_QUALITY_RESULT_VERSION } from './signalQualityEngine';
 import { OutcomeResult } from './outcomeResult';
 import { ValidatedLabeledDataset, createValidatedDataset } from './validatedDataset';
@@ -69,6 +70,15 @@ function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | 
   if (!['long', 'short'].includes(record.metadata.direction)) return null;
   if (!['OB', 'FVG'].includes(record.poi.poiType)) return null;
   if (!['BOS', 'CHoCH'].includes(record.structure.eventType)) return null;
+
+  const grade: GradeResult = {
+    totalScore: record.grade.totalScore,
+    grade: record.grade.grade,
+    entryAllowed: record.grade.entryAllowed,
+    breakdown: record.grade.breakdown,
+    blockReasons: Array.from(record.grade.blockReasons),
+  };
+
   return {
     snapshotVersion: SIGNAL_INTELLIGENCE_SNAPSHOT_VERSION,
     timestamp: new Date(record.metadata.timestamp).toISOString(),
@@ -84,10 +94,7 @@ function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | 
       relatedEventTimestamp: record.structure.eventTimestamp,
     },
     signalQuality: record.signalQuality,
-    grade: {
-      ...record.grade,
-      blockReasons: [...record.grade.blockReasons],
-    },
+    grade,
     engine: { signalQualityVersion: SIGNAL_QUALITY_RESULT_VERSION, gradeVersion: GRADE_ENGINE_VERSION },
   };
 }
