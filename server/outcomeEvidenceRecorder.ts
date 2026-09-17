@@ -15,10 +15,10 @@ export interface OutcomeEvidenceAppendInput {
   readonly evaluation?: CompletedSignalOutcomeEvaluationEvidence | null;
 }
 
-export function appendCompletedSignalOutcomeEvidenceAsync(
+export async function appendCompletedSignalOutcomeEvidenceAsync(
   input: OutcomeEvidenceAppendInput,
   store: EvidenceStore = defaultStore
-): void {
+): Promise<void> {
   if (process.env.ENABLE_EVIDENCE_RECORDER === 'false') {
     return;
   }
@@ -37,7 +37,9 @@ export function appendCompletedSignalOutcomeEvidenceAsync(
     ...(input.evaluation ? { evaluation: input.evaluation } : {}),
   });
 
-  void store.appendOutcomeEvidence(record).catch(error => {
-    console.warn(`[EvidenceRecorder] Outcome evidence write failed for ${record.signalId}:`, error);
-  });
+  try {
+    await store.appendOutcomeEvidence(record);
+  } catch (error) {
+    throw new Error(`[EvidenceRecorder] Outcome evidence write failed for ${record.signalId}: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
