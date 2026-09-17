@@ -9,7 +9,10 @@ export interface TemporalDatasetSplit {
   train: ValidatedLabeledDataset;
   outOfSample: ValidatedLabeledDataset;
   trainCutoffTimestamp: string;
+  outOfSampleStartTimestamp: string;
   trainFraction: number;
+  rawTrainCandidateCount: number;
+  purgedTrainCount: number;
 }
 
 export type OosPatternStatus = 'VALIDATED' | 'FAILED' | 'INSUFFICIENT_SAMPLE' | 'SEGMENT_MISSING';
@@ -53,14 +56,28 @@ export function splitDatasetByTime(
   });
 
   const splitIndex = Math.min(items.length - 1, Math.max(1, Math.floor(items.length * trainFraction)));
-  const trainItems = items.slice(0, splitIndex);
+  const rawTrainItems = items.slice(0, splitIndex);
   const outOfSampleItems = items.slice(splitIndex);
+  const outOfSampleStartTimestamp = outOfSampleItems[0].snapshot.timestamp;
+  const boundaryTimestamp = Date.parse(outOfSampleStartTimestamp);
+
+  // Purge training observations whose realized outcome extends into the OOS period.
+  // Otherwise the training label contains information from the future relative to the model's split point.
+  const trainItems = rawTrainItems.filter(item => {
+    const outcomeEnd = item.outcome.metadata.endTimestamp ?? item.outcome.metadata.resolvedAtTimestamp;
+    return outcomeEnd === null || outcomeEnd < boundaryTimestamp;
+  });
 
   return {
     train: createSubsetDataset(trainItems),
     outOfSample: createSubsetDataset(outOfSampleItems),
-    trainCutoffTimestamp: trainItems[trainItems.length - 1].snapshot.timestamp,
+    trainCutoffTimestamp: trainItems.length > 0
+      ? trainItems[trainItems.length - 1].snapshot.timestamp
+      : rawTrainItems[rawTrainItems.length - 1].snapshot.timestamp,
+    outOfSampleStartTimestamp,
     trainFraction: splitIndex / items.length,
+    rawTrainCandidateCount: rawTrainItems.length,
+    purgedTrainCount: rawTrainItems.length - trainItems.length,
   };
 }
 
