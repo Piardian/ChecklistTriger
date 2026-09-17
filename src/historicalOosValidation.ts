@@ -1,7 +1,6 @@
-import { generateBenchmark } from './benchmarkEngine';
 import { LearnedPattern } from './learningPattern';
 import { LearningMetric } from './learningObservation';
-import { SEGMENT_DEFINITIONS, SegmentKey } from './segmentDefinitions';
+import { SegmentKey } from './segmentDefinitions';
 import { generateSegmentedBenchmark } from './segmentedBenchmark';
 import { ValidatedLabeledDataset, ValidatedLabeledSignal } from './validatedDataset';
 import { BenchmarkReport } from './benchmarkReport';
@@ -67,13 +66,14 @@ export function splitDatasetByTime(
 
 export function validatePatternsOutOfSample(
   patterns: readonly LearnedPattern[],
+  trainSampleSize: number,
   outOfSample: ValidatedLabeledDataset,
   minimumOosSampleSize = 30
 ): OosValidationReport {
   if (patterns.length === 0) {
     return Object.freeze({
       status: 'NO_PATTERNS',
-      trainSampleSize: 0,
+      trainSampleSize,
       outOfSampleSampleSize: outOfSample.items.length,
       validatedPatternCount: 0,
       failedPatternCount: 0,
@@ -159,7 +159,7 @@ export function validatePatternsOutOfSample(
 
   return Object.freeze({
     status,
-    trainSampleSize: 0,
+    trainSampleSize,
     outOfSampleSampleSize: outOfSample.items.length,
     validatedPatternCount,
     failedPatternCount,
@@ -210,6 +210,3 @@ function preservesPatternDirection(type: LearnedPattern['type'], difference: num
 function round(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
-
-void SEGMENT_DEFINITIONS;
-void generateBenchmark;
