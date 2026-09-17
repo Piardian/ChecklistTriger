@@ -490,7 +490,7 @@ function recordReplayEvidence(
   const store = new JsonlEvidenceStore(evidenceDir);
   const execution = runRuntimeExecutionPipeline(candidate, new NoopSignalRepository());
   const signalRecord = buildSignalEvidenceRecord(candidate, execution, candles15m);
-  void store.appendSignalEvidence(signalRecord);
+  store.appendSignalEvidenceSync(signalRecord);
 
   if (outcome.outcome && outcome.evaluation) {
     const outcomeType = outcome.outcome.outcomeType === 'TAKE_PROFIT'
@@ -528,7 +528,7 @@ function recordReplayEvidence(
       },
       evaluation: outcome.evaluation,
     });
-    void store.appendOutcomeEvidence(outcomeRecord);
+    store.appendOutcomeEvidenceSync(outcomeRecord);
   }
 
   if (outcome.pricePath && outcome.pricePath.length > 0) {
@@ -538,9 +538,7 @@ function recordReplayEvidence(
       recordedAt: new Date().toISOString(),
       points: outcome.pricePath,
     });
-    if (store.appendPricePathEvidence) {
-      void store.appendPricePathEvidence(pricePathRecord);
-    }
+    store.appendPricePathEvidenceSync(pricePathRecord);
   }
 }
 

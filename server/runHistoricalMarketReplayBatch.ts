@@ -8,6 +8,8 @@ import {
 import { StoredCandle } from './candleStore';
 import { ALL_SYMBOLS, Symbol } from './universe';
 
+import { readAndExportResearchDataset } from '../src/researchDatasetExporter';
+
 const REPLAY_SYMBOLS = ALL_SYMBOLS;
 type ReplaySymbol = (typeof REPLAY_SYMBOLS)[number];
 
@@ -46,11 +48,25 @@ function main(): void {
     }
   }
 
+  const recordEvidence = optionalBoolean(process.env.REPLAY_RECORD_EVIDENCE, true);
+  const evidenceDir = process.env.REPLAY_EVIDENCE_DIR ?? 'evidence/replay';
+  const includePricePath = optionalBoolean(process.env.REPLAY_INCLUDE_PRICE_PATH, true);
+  const cleanEvidence = optionalBoolean(process.env.REPLAY_CLEAN_EVIDENCE, true);
+
+  if (recordEvidence && cleanEvidence) {
+    fs.rmSync(path.join(evidenceDir, 'signals'), { recursive: true, force: true });
+    fs.rmSync(path.join(evidenceDir, 'outcomes'), { recursive: true, force: true });
+    fs.rmSync(path.join(evidenceDir, 'price-paths'), { recursive: true, force: true });
+  }
+
   const sessionOptions = {
     startedTimestamp: optionalNumber(process.env.REPLAY_STARTED_TIMESTAMP),
     finishedTimestamp: optionalNumber(process.env.REPLAY_FINISHED_TIMESTAMP),
     respectMarketWindow: optionalBoolean(process.env.REPLAY_RESPECT_MARKET_WINDOW, true),
     respectKillzone: optionalBoolean(process.env.REPLAY_RESPECT_KILLZONE, true),
+    recordEvidence,
+    evidenceDir,
+    includePricePath,
     onSession: (
       session: { replayStepCount: number; candidateCount: number },
       symbol: Symbol,
@@ -72,10 +88,36 @@ function main(): void {
 
   const outputFile = path.resolve(
     process.env.HISTORICAL_MARKET_REPLAY_BATCH_REPORT_FILE ??
-      'evidence/replay/historical-market-replay-batch-report.json'
+      path.join(evidenceDir, 'historical-market-replay-batch-report.json')
   );
   fs.mkdirSync(path.dirname(outputFile), { recursive: true });
   fs.writeFileSync(outputFile, JSON.stringify(report, null, 2), 'utf8');
+
+  if (recordEvidence && batch.aggregate.candidates > 0) {
+    const signalsFile = path.join(evidenceDir, 'signals', 'signal-evidence.jsonl');
+    const outcomesFile = path.join(evidenceDir, 'outcomes', 'outcome-evidence.jsonl');
+    const pricePathsFile = path.join(evidenceDir, 'price-paths', 'price-path-evidence.jsonl');
+    const datasetJson = path.join(evidenceDir, 'research-dataset.json');
+    const datasetCsv = path.join(evidenceDir, 'research-dataset.csv');
+
+    const jsonExport = readAndExportResearchDataset({
+      signalsFile,
+      outcomesFile,
+      pricePathsFile,
+      outputFile: datasetJson,
+      format: 'json',
+    });
+    readAndExportResearchDataset({
+      signalsFile,
+      outcomesFile,
+      pricePathsFile,
+      outputFile: datasetCsv,
+      format: 'csv',
+    });
+    console.log(
+      `[HistoricalMarketReplayBatch] dataset exported (${jsonExport.rows.length} rows): ${datasetJson} & ${datasetCsv}`
+    );
+  }
 
   console.log('');
   console.log('[HistoricalMarketReplayBatch] ===== SUMMARY =====');

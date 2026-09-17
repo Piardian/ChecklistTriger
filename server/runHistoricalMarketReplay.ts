@@ -7,6 +7,8 @@ import {
 import { StoredCandle } from './candleStore';
 import { ALL_SYMBOLS, Symbol } from './universe';
 
+import { readAndExportResearchDataset } from '../src/researchDatasetExporter';
+
 const REPLAY_SYMBOLS = [...ALL_SYMBOLS, 'BTCEUR', 'ETHEUR', 'LTCEUR'] as const;
 
 type ReplaySymbol = (typeof REPLAY_SYMBOLS)[number];
@@ -24,26 +26,74 @@ function main(): void {
   const finishedTimestamp = optionalNumber(process.env.REPLAY_FINISHED_TIMESTAMP);
   const respectMarketWindow = optionalBoolean(process.env.REPLAY_RESPECT_MARKET_WINDOW, true);
   const respectKillzone = optionalBoolean(process.env.REPLAY_RESPECT_KILLZONE, true);
+  const recordEvidence = optionalBoolean(process.env.REPLAY_RECORD_EVIDENCE, true);
+  const evidenceDir = process.env.REPLAY_EVIDENCE_DIR ?? 'evidence/replay';
+  const includePricePath = optionalBoolean(process.env.REPLAY_INCLUDE_PRICE_PATH, true);
+  const cleanEvidence = optionalBoolean(process.env.REPLAY_CLEAN_EVIDENCE, true);
+
+  if (recordEvidence && cleanEvidence) {
+    fs.rmSync(path.join(evidenceDir, 'signals'), { recursive: true, force: true });
+    fs.rmSync(path.join(evidenceDir, 'outcomes'), { recursive: true, force: true });
+    fs.rmSync(path.join(evidenceDir, 'price-paths'), { recursive: true, force: true });
+  }
 
   const session = runHistoricalMarketReplay(dataset, {
     startedTimestamp,
     finishedTimestamp,
     respectMarketWindow,
     respectKillzone,
+    recordEvidence,
+    evidenceDir,
+    includePricePath,
   });
 
   const outputFile = path.resolve(
     process.env.HISTORICAL_MARKET_REPLAY_REPORT_FILE ??
-      'evidence/replay/historical-market-replay-report.json'
+      path.join(evidenceDir, 'historical-market-replay-report.json')
   );
   fs.mkdirSync(path.dirname(outputFile), { recursive: true });
   fs.writeFileSync(outputFile, JSON.stringify(session, null, 2), 'utf8');
+
+  let exportedRows = 0;
+  if (recordEvidence && session.candidateCount > 0) {
+    const signalsFile = path.join(evidenceDir, 'signals', 'signal-evidence.jsonl');
+    const outcomesFile = path.join(evidenceDir, 'outcomes', 'outcome-evidence.jsonl');
+    const pricePathsFile = path.join(evidenceDir, 'price-paths', 'price-path-evidence.jsonl');
+    const datasetJson = path.join(evidenceDir, 'research-dataset.json');
+    const datasetCsv = path.join(evidenceDir, 'research-dataset.csv');
+
+    const jsonExport = readAndExportResearchDataset({
+      signalsFile,
+      outcomesFile,
+      pricePathsFile,
+      outputFile: datasetJson,
+      format: 'json',
+    });
+    readAndExportResearchDataset({
+      signalsFile,
+      outcomesFile,
+      pricePathsFile,
+      outputFile: datasetCsv,
+      format: 'csv',
+    });
+    exportedRows = jsonExport.rows.length;
+    console.log(`[HistoricalMarketReplay] dataset exported (${exportedRows} rows): ${datasetJson} & ${datasetCsv}`);
+  }
+
+  const tpCount = session.trades.filter(t => t.outcomeStatus === 'TAKE_PROFIT').length;
+  const slCount = session.trades.filter(t => t.outcomeStatus === 'STOP_LOSS').length;
+  const expCount = session.trades.filter(t => t.outcomeStatus === 'EXPIRED').length;
+  const unresCount = session.trades.filter(t => t.outcomeStatus === 'UNRESOLVED').length;
+  const resolvedCount = tpCount + slCount;
+  const winRate = resolvedCount > 0 ? (tpCount / resolvedCount) * 100 : null;
 
   console.log(`[HistoricalMarketReplay] report=${outputFile}`);
   console.log(
     `[HistoricalMarketReplay] symbol=${session.symbol} steps=${session.replayStepCount} ` +
       `candidates=${session.candidateCount} completed=${session.completedOutcomeCount} ` +
-      `unresolved=${session.unresolvedOutcomeCount}`
+      `unresolved=${session.unresolvedOutcomeCount} ` +
+      `TP=${tpCount} SL=${slCount} EXPIRED=${expCount} UNRESOLVED=${unresCount} ` +
+      `winRate=${winRate !== null ? winRate.toFixed(1) + '%' : 'N/A'}`
   );
 }
 
