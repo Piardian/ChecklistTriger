@@ -8,8 +8,8 @@ test('Wilson interval is deterministic and bounded', () => {
     successCount: 60,
     trialCount: 100,
     estimate: 0.6,
-    lower: 0.502, 
-    upper: 0.6915,
+    lower: 0.502,
+    upper: 0.6906,
   });
 });
 
