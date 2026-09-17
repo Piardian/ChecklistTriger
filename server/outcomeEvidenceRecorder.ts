@@ -19,9 +19,7 @@ export async function appendCompletedSignalOutcomeEvidenceAsync(
   input: OutcomeEvidenceAppendInput,
   store: EvidenceStore = defaultStore
 ): Promise<void> {
-  if (process.env.ENABLE_EVIDENCE_RECORDER === 'false') {
-    return;
-  }
+  if (process.env.ENABLE_EVIDENCE_RECORDER === 'false') return;
 
   const record = createCompletedSignalOutcomeEvidence({
     signalId: input.signalId,
@@ -37,9 +35,5 @@ export async function appendCompletedSignalOutcomeEvidenceAsync(
     ...(input.evaluation ? { evaluation: input.evaluation } : {}),
   });
 
-  try {
-    await store.appendOutcomeEvidence(record);
-  } catch (error) {
-    throw new Error(`[EvidenceRecorder] Outcome evidence write failed for ${record.signalId}: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  await store.appendOutcomeEvidence(record);
 }
