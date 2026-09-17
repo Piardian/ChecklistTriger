@@ -92,6 +92,40 @@ test('builds a validated dataset from matched signal and outcome evidence', () =
   }
 });
 
+test('uses persisted outcome evaluation metadata when it is available', () => {
+  const base = 1700000000000;
+  const signalsFile = writeFixture([signal('S1', base)]);
+  const evidence = outcome('S1', base + 7200000, 'TP');
+  const outcomesFile = writeFixture([{
+    ...evidence,
+    evaluation: {
+      version: 1,
+      entryPrice: 1.105,
+      stopPrice: 1.0999,
+      targetPrice: 1.1152,
+      riskDistance: 0.0051,
+      entryWindowBars: 16,
+      maxHoldBars: 32,
+      sameCandleResolution: 'STOP_LOSS_FIRST',
+      entryTriggeredAt: base + 900000,
+      evaluatedCandles: 7,
+      evaluationStartTimestamp: base,
+      evaluationEndTimestamp: base + 7200000,
+    },
+  }]);
+  try {
+    const result = buildHistoricalLearningDataset({ signalsFile, outcomesFile });
+    const metadata = result.dataset.items[0].outcome.metadata;
+    expect(metadata.startTimestamp).toBe(base);
+    expect(metadata.endTimestamp).toBe(base + 7200000);
+    expect(metadata.evaluatedCandles).toBe(7);
+    expect(metadata.evaluationDurationBars).toBe(7);
+  } finally {
+    fs.rmSync(path.dirname(signalsFile), { recursive: true, force: true });
+    fs.rmSync(path.dirname(outcomesFile), { recursive: true, force: true });
+  }
+});
+
 test('historical learning uses an ordered and purged train split with separate OOS validation', () => {
   const base = 1700000000000;
   const signals = Array.from({ length: 40 }, (_, index) => signal(`S${index + 1}`, base + index * 900000, index % 2 === 0 ? 'A' : 'A+'));
