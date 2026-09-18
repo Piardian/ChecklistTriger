@@ -6,7 +6,9 @@ export interface ProviderRequest {
   readonly endpoint: typeof TWELVE_DATA_TIME_SERIES_ENDPOINT;
   readonly symbol: Symbol;
   readonly timeframe: Timeframe;
-  readonly outputSize: number;
+  readonly outputSize?: number;
+  readonly startDate?: string;
+  readonly endDate?: string;
 }
 
 export interface ProviderResponseMetadata {
