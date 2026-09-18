@@ -43,8 +43,12 @@ function validateCandles(candles: readonly StoredCandle[], timeframe: Timeframe,
     if (c.high < Math.max(c.open, c.close) || c.low > Math.min(c.open, c.close) || c.high < c.low) {
       throw new Error(`Invalid OHLC: ${symbol} ${timeframe} index=${i}`);
     }
-    if (c.timestamp % intervalMs !== 0) throw new Error(`Misaligned timestamp: ${symbol} ${timeframe} index=${i}`);
-    if (i > 0 && c.timestamp <= candles[i - 1].timestamp) throw new Error(`Non-monotonic timestamps: ${symbol} ${timeframe} index=${i}`);
+    if (!Number.isInteger(c.timestamp) || c.timestamp <= 0) throw new Error(`Invalid timestamp: ${symbol} ${timeframe} index=${i}`);
+    if (i > 0) {
+      const delta = c.timestamp - candles[i - 1].timestamp;
+      if (delta <= 0) throw new Error(`Non-monotonic timestamps: ${symbol} ${timeframe} index=${i}`);
+      if (delta < intervalMs) throw new Error(`Overlapping/duplicate candle interval: ${symbol} ${timeframe} index=${i}`);
+    }
   }
 }
 
