@@ -111,7 +111,6 @@ async function executeTwelveDataRequest(
   if (request.startDate && request.endDate) {
     params.set('start_date', request.startDate);
     params.set('end_date', request.endDate);
-    params.set('order', 'asc');
   } else if (request.outputSize !== undefined) {
     params.set('outputsize', String(request.outputSize));
   }
