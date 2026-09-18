@@ -26,6 +26,22 @@ export async function fetchCandles(
   return result.candles;
 }
 
+export async function fetchHistoricalCandles(
+  symbol: Symbol,
+  timeframe: Timeframe,
+  startDate: string,
+  endDate: string
+): Promise<StoredCandle[]> {
+  const result = await providerQueue().enqueue({
+    endpoint: TWELVE_DATA_TIME_SERIES_ENDPOINT,
+    symbol,
+    timeframe,
+    startDate,
+    endDate,
+  });
+  return result.candles;
+}
+
 export function getTwelveDataQueueMetrics(): ProviderQueueMetrics {
   return providerQueue().getMetrics();
 }
@@ -86,9 +102,20 @@ async function executeTwelveDataRequest(
   const apiKey = keys[keyIndex % keys.length];
   const mappedSymbol = mapSymbol(request.symbol);
   const mappedInterval = mapInterval(request.timeframe);
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(
-    mappedSymbol
-  )}&interval=${mappedInterval}&outputsize=${request.outputSize}&apikey=${apiKey}&timezone=UTC`;
+  const params = new URLSearchParams({
+    symbol: mappedSymbol,
+    interval: mappedInterval,
+    apikey: apiKey,
+    timezone: 'UTC',
+  });
+  if (request.startDate && request.endDate) {
+    params.set('start_date', request.startDate);
+    params.set('end_date', request.endDate);
+    params.set('order', 'asc');
+  } else if (request.outputSize !== undefined) {
+    params.set('outputsize', String(request.outputSize));
+  }
+  const url = `https://api.twelvedata.com/time_series?${params.toString()}`;
   const requestTimeoutMs = envInteger('TWELVE_DATA_REQUEST_TIMEOUT_MS', 15_000);
   const startedAtMs = Date.now();
   const requestTimestamp = new Date(startedAtMs).toISOString();
