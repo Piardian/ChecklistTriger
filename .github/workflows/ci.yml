@@ -2,7 +2,7 @@
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "research/historical-ingestion-2026-09" ]
   pull_request:
     branches: [ "main", "audit-fixes-2026-09" ]
 
@@ -19,7 +19,6 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
