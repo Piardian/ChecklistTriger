@@ -199,7 +199,7 @@ function analyzeQuality(
       narrativeAssessment.overallNarrative === 'High' ? 'High' :
         narrativeAssessment.overallNarrative === 'Medium' ? 'Medium' : 'Low';
 
-  const overallQuality = weakestQuality([
+  const overallQuality = aggregateQuality([
     poiQuality,
     structureQuality,
     displacementQuality,
@@ -292,7 +292,20 @@ function explainAssessment(
   };
 }
 
-function weakestQuality(values: readonly QualityLevel[]): QualityLevel {
+/**
+ * Aggregates independent evidence dimensions without letting a single
+ * non-critical Medium dimension mathematically erase otherwise elite evidence.
+ *
+ * This is deliberately not an arithmetic mean alone:
+ * - Invalid/Unknown evidence cannot produce an Elite setup.
+ * - Low evidence is a quality floor.
+ * - Elite requires at least two Elite dimensions and an average rank of 4+.
+ * - High is the default upper band when evidence is broadly strong.
+ *
+ * The hard grade caps remain downstream in setupQualityRules.ts, so contextual
+ * conflicts and POI freshness rules still constrain admission independently.
+ */
+function aggregateQuality(values: readonly QualityLevel[]): QualityLevel {
   const rank: Record<QualityLevel, number> = {
     Elite: 5,
     High: 4,
@@ -301,7 +314,28 @@ function weakestQuality(values: readonly QualityLevel[]): QualityLevel {
     Invalid: 1,
     Unknown: 0,
   };
-  return values.reduce((weakest, value) => rank[value] < rank[weakest] ? value : weakest, 'Elite' as QualityLevel);
+
+  if (values.some(value => value === 'Invalid' || value === 'Unknown')) {
+    return 'Invalid';
+  }
+
+  if (values.some(value => value === 'Low')) {
+    return 'Low';
+  }
+
+  const total = values.reduce((sum, value) => sum + rank[value], 0);
+  const average = total / values.length;
+  const eliteCount = values.filter(value => value === 'Elite').length;
+
+  if (eliteCount >= 2 && average >= 4) {
+    return 'Elite';
+  }
+
+  if (average >= 3.5) {
+    return 'High';
+  }
+
+  return 'Medium';
 }
 
 function qualityToGrade(quality: QualityLevel): SetupGradeValue {
