@@ -7,7 +7,11 @@ The Learning Engine is not AI, not an LLM, not a prediction engine, and not a De
 ## Data Flow
 
 ```text
-SegmentedBenchmarkReport
+Validated historical signal + outcome evidence
+        ↓
+Deterministic time split + leakage purge
+        ↓
+Training SegmentedBenchmarkReport
         ↓
 Observation Engine
         ↓
@@ -16,6 +20,10 @@ Learning Observations
 Pattern Detector
         ↓
 LearningReport
+        ↓
+Separate out-of-sample benchmark
+        ↓
+Out-of-sample pattern validation
 ```
 
 ## Public API
@@ -24,7 +32,7 @@ LearningReport
 generateLearningReport(segmentedBenchmarkReport): LearningReport
 ```
 
-This is the only public entry point.
+The historical orchestration layer is exposed separately through `generateHistoricalLearningReport(...)` and is responsible for dataset loading, temporal splitting, and OOS validation.
 
 ## Architectural Boundary
 
@@ -39,6 +47,18 @@ It does not:
 - filter signals;
 - write to Telegram;
 - make trade recommendations.
+
+Historical orchestration performs those upstream responsibilities before data reaches the Learning Engine.
+
+## Training vs Out-of-Sample
+
+Historical learning uses a deterministic chronological split. The default is approximately 70% training and 30% out-of-sample.
+
+Training observations whose realized outcome extends into the out-of-sample period are purged. This prevents future outcome information from leaking into the training sample.
+
+The out-of-sample period is never used to create the learned pattern. It is only used afterward to test whether the observed direction is reproduced on unseen future observations.
+
+An out-of-sample result labelled `VALIDATED` means only that the historical direction was reproduced with the configured minimum sample size. It is not a claim of causality, profitability, or statistical significance.
 
 ## Observation vs Pattern
 
@@ -58,7 +78,7 @@ Example:
 grade:A+ shows PERFORMANCE_ADVANTAGE on TPRate versus the overall historical benchmark.
 ```
 
-Sprint 6 v1 keeps this deliberately conservative: every pattern is explainable from its source observation.
+Every pattern remains traceable to its source observation and benchmark fingerprint.
 
 ## Eligibility Rules
 
@@ -72,17 +92,13 @@ belowRecommendedSample == false
 
 Segments that do not satisfy these rules produce typed warnings instead of patterns.
 
-## Confidence
+## Confidence and Statistical Uncertainty
 
-Confidence is not an AI score and not a probability of future success.
+`confidence` is an evidence-quality heuristic based on sample size and coverage. It is explicitly labelled with the method `HEURISTIC_SAMPLE_COVERAGE` and must not be interpreted as the probability that a pattern will work in the future.
 
-It only represents evidence quality:
+For binary rate metrics (`TPRate` and `SLRate`), the pattern also carries a 95% Wilson binomial interval. This interval describes uncertainty around the observed segment rate; it is not a causal significance test and it does not compare two independent proportions.
 
-```text
-sample + coverage + stability
-```
-
-In Sprint 6 v1, stability is reserved in the contract as `UNKNOWN`.
+The definitive guard against overfitting is therefore the chronological out-of-sample check, not the heuristic confidence field.
 
 ## Explainability
 
@@ -108,5 +124,4 @@ Learning  → Infer
 Decision  → Act
 ```
 
-Sprint 6 stops at inference over historical evidence.
-
+Historical learning remains an offline research process. Runtime admission evaluates the current candidate directly and does not fabricate historical TPRate, sample size, coverage, or confidence values.

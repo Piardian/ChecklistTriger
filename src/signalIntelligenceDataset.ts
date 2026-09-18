@@ -203,7 +203,6 @@ function validateSnapshotSchema(
     typeof snapshot.timestamp !== 'string' ||
     !(ALL_SYMBOLS as readonly string[]).includes(snapshot.symbol) ||
     snapshot.timeframe !== '15m' ||
-
     typeof snapshot.candidateId !== 'string' ||
     !isObject(snapshot.candidate) ||
     !isObject(snapshot.signalQuality) ||
@@ -216,7 +215,7 @@ function validateSnapshotSchema(
   if (
     !['OB', 'FVG'].includes(snapshot.candidate.poiType) ||
     !['long', 'short'].includes(snapshot.candidate.tradeDirection) ||
-    typeof snapshot.candidate.currentPrice !== 'number' ||
+    (snapshot.candidate.currentPrice !== null && typeof snapshot.candidate.currentPrice !== 'number') ||
     typeof snapshot.candidate.poiFormedTimestamp !== 'number' ||
     !['BOS', 'CHoCH'].includes(snapshot.candidate.relatedEventType) ||
     typeof snapshot.candidate.relatedEventTimestamp !== 'number'

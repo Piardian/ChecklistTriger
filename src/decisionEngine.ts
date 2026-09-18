@@ -25,6 +25,7 @@ export function generateDecisionReport(
       decisionReportVersion: DECISION_REPORT_VERSION,
       learningReportVersion: learningReport.metadata.learningReportVersion,
       datasetFingerprint: learningReport.metadata.datasetFingerprint,
+      source: 'HISTORICAL_LEARNING' as const,
       generatedFromPolicyId: policy.policyId,
       generatedFromPolicyVersion: policy.version,
     }),

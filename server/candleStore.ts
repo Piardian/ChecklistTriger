@@ -31,9 +31,7 @@ export class CandleStore {
 
   getFileMtime(symbol: Symbol, timeframe: Timeframe): number | null {
     const filePath = this.getFilePath(symbol, timeframe);
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
+    if (!fs.existsSync(filePath)) return null;
     try {
       return fs.statSync(filePath).mtimeMs;
     } catch {
@@ -60,28 +58,29 @@ export class CandleStore {
 
     const filePath = this.getFilePath(symbol, timeframe);
     let candles = this.getCandles(symbol, timeframe);
+    let appended = false;
 
     if (candles.length === 0) {
       candles.push(candle);
+      appended = true;
     } else {
       const lastCandle = candles[candles.length - 1];
       if (candle.timestamp > lastCandle.timestamp) {
         candles.push(candle);
+        appended = true;
       } else if (candle.timestamp === lastCandle.timestamp) {
-        // Overwrite last candle
+        // Overwrite last candle. It may still be an updated market-data snapshot.
         candles[candles.length - 1] = candle;
+        appended = true;
       } else {
-        // Older timestamp: ignore completely
         return;
       }
     }
 
-    // Limit to 500 candles
     if (candles.length > 500) {
       candles = candles.slice(candles.length - 500);
     }
 
-    // Safe atomic write logic
     const tempFilePath = `${filePath}.${Date.now()}.${Math.random().toString(36).substring(2, 6)}.tmp`;
     try {
       fs.writeFileSync(tempFilePath, JSON.stringify(candles, null, 2), 'utf8');
@@ -91,22 +90,91 @@ export class CandleStore {
         fs.copyFileSync(tempFilePath, filePath);
         try { fs.unlinkSync(tempFilePath); } catch {}
       }
-    } catch {
-      fs.writeFileSync(filePath, JSON.stringify(candles, null, 2), 'utf8');
+    } catch (error) {
+      try { fs.unlinkSync(tempFilePath); } catch {}
+      throw new Error(`[CandleStore] Failed to persist ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    // Dynamic import avoids a module cycle: outcomeTracker depends on pipeline types,
+    // while CandleStore is imported by the live pipeline itself.
+    if (appended && timeframe === '15m') {
+      void this.processOutcomeTracking(symbol, candles);
     }
   }
 
   getCandles(symbol: Symbol, timeframe: Timeframe): StoredCandle[] {
     const filePath = this.getFilePath(symbol, timeframe);
-    if (!fs.existsSync(filePath)) {
-      return [];
-    }
+    if (!fs.existsSync(filePath)) return [];
 
     try {
       const content = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(content);
-    } catch (e) {
-      return [];
+      const parsed: unknown = JSON.parse(content);
+      if (!Array.isArray(parsed) || !parsed.every(isStoredCandle)) {
+        throw new Error('file does not contain a valid candle array');
+      }
+      return parsed;
+    } catch (error) {
+      throw new Error(`[CandleStore] Failed to read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  private async processOutcomeTracking(symbol: string, candles: readonly StoredCandle[]): Promise<void> {
+    try {
+      const { defaultMarketDataOutcomeTracker } = await import('../src/signalOutcomeTracker');
+      const { appendCompletedSignalOutcomeEvidenceAsync } = await import('./outcomeEvidenceRecorder');
+      const results = defaultMarketDataOutcomeTracker.process(symbol, candles);
+
+      for (const result of results) {
+        if (result.status !== 'COMPLETED' || !result.outcome) continue;
+
+        const signalId = result.outcome.signalId;
+        await appendCompletedSignalOutcomeEvidenceAsync({
+          signalId,
+          outcomeType: normalizeOutcomeType(result.outcome.outcomeType),
+          holdingTimeMs: result.entryTriggeredAt === null
+            ? null
+            : Math.max(0, result.outcome.timestamp - result.entryTriggeredAt),
+          rrAchieved: result.rrAchieved,
+          maximumFavorableExcursion: result.maximumFavorableExcursion,
+          maximumAdverseExcursion: result.maximumAdverseExcursion,
+          exitTimestamp: result.outcome.timestamp,
+          exitReason: result.outcome.reason.message,
+          evaluation: result.evaluation,
+        });
+
+        defaultMarketDataOutcomeTracker.acknowledgeCompleted(signalId);
+        console.log(
+          `[OutcomeTracker] ${signalId} -> ${result.outcome.outcomeType}` +
+          ` | RR=${result.rrAchieved ?? 'n/a'}` +
+          ` | exit=${new Date(result.outcome.timestamp).toISOString()}`
+        );
+      }
+    } catch (error) {
+      console.warn(`[OutcomeTracker] Processing failed for ${symbol}:`, error);
+    }
+  }
+}
+
+function normalizeOutcomeType(
+  outcomeType: 'WAITING_ENTRY' | 'ENTRY_TRIGGERED' | 'TAKE_PROFIT' | 'STOP_LOSS' | 'EXPIRED' | 'CANCELLED' | 'MANUAL_CANCELLED' | 'UNKNOWN'
+): 'TP' | 'SL' | 'BE' | 'MANUAL' | 'EXPIRED' | 'CANCELLED' | 'UNKNOWN' {
+  switch (outcomeType) {
+    case 'TAKE_PROFIT': return 'TP';
+    case 'STOP_LOSS': return 'SL';
+    case 'EXPIRED': return 'EXPIRED';
+    case 'CANCELLED': return 'CANCELLED';
+    case 'MANUAL_CANCELLED': return 'MANUAL';
+    case 'UNKNOWN': return 'UNKNOWN';
+    default: return 'UNKNOWN';
+  }
+}
+
+function isStoredCandle(value: unknown): value is StoredCandle {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return Number.isFinite(candidate.timestamp) &&
+    Number.isFinite(candidate.open) &&
+    Number.isFinite(candidate.high) &&
+    Number.isFinite(candidate.low) &&
+    Number.isFinite(candidate.close);
 }

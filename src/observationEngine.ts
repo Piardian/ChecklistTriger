@@ -11,10 +11,10 @@ export interface ObservationGenerationResult {
   skippedSegments: number;
 }
 
-const MIN_SAMPLE_SIZE = 30;
-const MIN_COVERAGE_RATE = 0.8;
-const RATE_DIFFERENCE_THRESHOLD = 0.05;
-const RELATIVE_DIFFERENCE_THRESHOLD = 0.2;
+export const MIN_LEARNING_SAMPLE_SIZE = 30;
+export const MIN_LEARNING_COVERAGE_RATE = 0.8;
+export const MIN_RATE_DIFFERENCE = 0.05;
+export const MIN_RELATIVE_DIFFERENCE = 0.2;
 
 export function generateObservations(report: SegmentedBenchmarkReport): ObservationGenerationResult {
   const observations: LearningObservation[] = [];
@@ -22,7 +22,7 @@ export function generateObservations(report: SegmentedBenchmarkReport): Observat
   let evaluatedSegments = 0;
   let skippedSegments = 0;
 
-  if (report.metadata.generatedAtDatasetCoverage < MIN_COVERAGE_RATE) {
+  if (report.metadata.generatedAtDatasetCoverage < MIN_LEARNING_COVERAGE_RATE) {
     warnings.push({
       type: 'LOW_COVERAGE',
       coverage: report.metadata.generatedAtDatasetCoverage,
@@ -69,7 +69,7 @@ function isEligible(
   segmentBenchmark: SegmentBenchmark,
   warnings: LearningWarning[]
 ): boolean {
-  if (segmentBenchmark.sampleSize < MIN_SAMPLE_SIZE || segmentBenchmark.belowRecommendedSample) {
+  if (segmentBenchmark.sampleSize < MIN_LEARNING_SAMPLE_SIZE || segmentBenchmark.belowRecommendedSample) {
     warnings.push({
       type: 'LOW_SAMPLE',
       segment,
@@ -81,7 +81,7 @@ function isEligible(
     return false;
   }
 
-  if (segmentBenchmark.benchmark.coverage.coverageRate < MIN_COVERAGE_RATE) {
+  if (segmentBenchmark.benchmark.coverage.coverageRate < MIN_LEARNING_COVERAGE_RATE) {
     warnings.push({
       type: 'LOW_COVERAGE',
       segment,
@@ -188,10 +188,10 @@ function getMetricValue(benchmark: BenchmarkReport, metric: LearningMetric): num
 
 function isMeaningfulDifference(metric: LearningMetric, difference: number, relativeDifference: number): boolean {
   if (metric === 'TPRate' || metric === 'SLRate') {
-    return Math.abs(difference) >= RATE_DIFFERENCE_THRESHOLD;
+    return Math.abs(difference) >= MIN_RATE_DIFFERENCE;
   }
 
-  return Math.abs(relativeDifference) >= RELATIVE_DIFFERENCE_THRESHOLD;
+  return Math.abs(relativeDifference) >= MIN_RELATIVE_DIFFERENCE;
 }
 
 function pickBenchmarkEvidence(benchmark: BenchmarkReport): Pick<BenchmarkReport, 'counts' | 'rates' | 'duration' | 'excursion'> {

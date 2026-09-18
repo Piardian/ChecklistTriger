@@ -47,16 +47,28 @@ export function runHistoricalReplay(input: {
   console.log('Replay Started');
 
   const query = Object.freeze({ ...(input.query ?? {}) });
-  const signals = sortChronologically(input.repository.listSignals(query));
+  const repositorySignals = sortChronologically(input.repository.listSignals(query));
+  const startedTimestamp =
+    input.startedTimestamp ?? repositorySignals[0]?.context.timestamp ?? 0;
+  const finishedTimestamp =
+    input.finishedTimestamp ??
+    repositorySignals[repositorySignals.length - 1]?.context.timestamp ??
+    startedTimestamp;
+
+  if (startedTimestamp > finishedTimestamp) {
+    throw new RangeError(
+      `Historical replay start timestamp (${startedTimestamp}) cannot be after finish timestamp (${finishedTimestamp}).`
+    );
+  }
+
+  const signals = filterByTimestampRange(
+    repositorySignals,
+    startedTimestamp,
+    finishedTimestamp
+  );
 
   console.log(`Signals Loaded: ${signals.length}`);
 
-  const startedTimestamp =
-    input.startedTimestamp ?? signals[0]?.context.timestamp ?? 0;
-  const finishedTimestamp =
-    input.finishedTimestamp ??
-    signals[signals.length - 1]?.context.timestamp ??
-    startedTimestamp;
   const processedSignals = Object.freeze(
     signals.map((signal, index) =>
       createProcessedReplaySignal({
@@ -130,6 +142,19 @@ function sortChronologically(signals: readonly SignalRecord[]): readonly SignalR
       const timestampDiff = left.context.timestamp - right.context.timestamp;
       if (timestampDiff !== 0) return timestampDiff;
       return left.signalId.localeCompare(right.signalId);
+    })
+  );
+}
+
+function filterByTimestampRange(
+  signals: readonly SignalRecord[],
+  startedTimestamp: number,
+  finishedTimestamp: number
+): readonly SignalRecord[] {
+  return Object.freeze(
+    signals.filter(signal => {
+      const timestamp = signal.context.timestamp;
+      return timestamp >= startedTimestamp && timestamp <= finishedTimestamp;
     })
   );
 }

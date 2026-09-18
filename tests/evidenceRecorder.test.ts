@@ -36,15 +36,21 @@ describe('Signal Evidence Recorder', () => {
       pd4H: 'discount',
       pd1H: 'discount',
       pd15M: 'discount',
+      bias15M: null,
+      htfAlignmentState: 'FULL_ALIGNMENT',
     });
     expect(evidence.structure).toEqual({
       eventType: 'BOS',
       eventTimestamp: 2000,
       eventTimeframe: '15m',
       structureScore: 2,
+      swingContext: null,
     });
+    expect(evidence.classification?.strategy).toBe('SWING_BOS_CORE');
+    expect(evidence.marketContext?.session).toBeDefined();
     expect(evidence.poi.zoneHigh).toBe(1.105);
     expect(evidence.poi.zoneLow).toBe(1.1);
+    expect(evidence.poi.midpoint).toBe(1.1025);
     expect(evidence.poi.poiAgeMs).toBe(1000);
     expect(evidence.displacement.bodyPercentage).toBe(50);
     expect(evidence.model.modelState).toBe('confirmed');

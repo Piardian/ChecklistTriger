@@ -12,11 +12,23 @@ export type LearnedPatternType =
 
 export type ConfidenceLevel = 'LOW' | 'MEDIUM' | 'HIGH';
 export type ConfidenceFactorLevel = ConfidenceLevel | 'UNKNOWN';
+export type LearningEvidenceProvenance = 'HISTORICAL' | 'SYNTHETIC_RUNTIME';
+export type ConfidenceMethod = 'HEURISTIC_SAMPLE_COVERAGE';
 
 export interface ConfidenceFactors {
   sample: ConfidenceLevel;
   coverage: ConfidenceLevel;
   stability: ConfidenceFactorLevel;
+}
+
+export interface StatisticalInterval {
+  method: 'WILSON_BINOMIAL_95';
+  confidenceLevel: 0.95;
+  successCount: number;
+  trialCount: number;
+  estimate: number;
+  lower: number;
+  upper: number;
 }
 
 export interface LearnedPattern {
@@ -28,7 +40,12 @@ export interface LearnedPattern {
   sampleSize: number;
   coverage: number;
   confidence: ConfidenceLevel;
+  confidenceMethod?: ConfidenceMethod;
   confidenceFactors: ConfidenceFactors;
+  /** Provenance is optional for backwards compatibility; omitted means historical. */
+  provenance?: LearningEvidenceProvenance;
+  /** Statistical uncertainty for binary rate metrics. This is not a causal significance test. */
+  statisticalInterval?: StatisticalInterval;
   comparisonEvidence: ComparisonEvidence;
   evidence: {
     observationId: string;
@@ -60,4 +77,3 @@ export interface LearnedPattern {
     segmentedBenchmarkVersion: number;
   };
 }
-

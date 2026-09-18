@@ -40,6 +40,20 @@ Each Signal is replayed through the existing Intelligence Pipeline using a signa
 - `duration`
 - side-effect metadata
 
+## Timestamp Range
+
+`startedTimestamp` and `finishedTimestamp` define an inclusive replay window.
+
+A Signal is replayed only when:
+
+```text
+startedTimestamp <= signal.context.timestamp <= finishedTimestamp
+```
+
+When a boundary is omitted, it is derived from the earliest or latest Signal in the requested Repository scope.
+
+A replay with `startedTimestamp > finishedTimestamp` is rejected with a `RangeError` rather than silently producing an invalid duration.
+
 ## Determinism
 
 Replay does not use random IDs, wall-clock time, `Date.now()`, UUID generation, or external services.

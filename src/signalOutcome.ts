@@ -19,6 +19,7 @@ export type SignalOutcomeReasonCode =
   | 'TAKE_PROFIT_REACHED'
   | 'STOP_LOSS_REACHED'
   | 'ENTRY_WINDOW_EXPIRED'
+  | 'MAX_HOLD_EXPIRED'
   | 'SIGNAL_CANCELLED'
   | 'SIGNAL_MANUALLY_CANCELLED'
   | 'OUTCOME_UNKNOWN';
@@ -85,7 +86,7 @@ export function createWaitingEntryOutcome(signalContext: SignalContext): SignalO
     outcomeType: 'WAITING_ENTRY',
     reason: {
       code: 'WAITING_FOR_ENTRY_RETEST',
-      message: 'Signal passed risk evaluation and is waiting for entry-zone retest. No real TP/SL tracking is performed in this foundation sprint.',
+      message: 'Signal passed risk evaluation and is waiting for entry-zone retest. No broker execution is implied.',
     },
   });
 }
@@ -111,4 +112,3 @@ function defaultReason(outcomeType: SignalOutcomeType): SignalOutcomeReason {
       return { code: 'WAITING_FOR_ENTRY_RETEST', message: 'Signal is waiting for entry-zone retest.' };
   }
 }
-

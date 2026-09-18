@@ -11,6 +11,8 @@ export interface ValidatedLabeledSignal {
 export interface ValidatedLabeledDataset {
   readonly items: readonly ValidatedLabeledSignal[];
   readonly coverage: DatasetCoverage;
+  /** Coverage of the original source evidence before creating a labeled subset. */
+  readonly sourceCoverageRate?: number;
 }
 
 export interface CreateValidatedDatasetInput {

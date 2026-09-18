@@ -1,25 +1,44 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { CompletedSignalOutcomeEvidence, SignalEvidenceRecord } from '../src/signalEvidence';
+import { CompletedSignalOutcomeEvidence, SignalEvidenceRecord, SignalPricePathEvidenceRecord } from '../src/signalEvidence';
 
 export interface EvidenceStore {
   appendSignalEvidence(record: SignalEvidenceRecord): Promise<void>;
   appendOutcomeEvidence(record: CompletedSignalOutcomeEvidence): Promise<void>;
+  appendPricePathEvidence?(record: SignalPricePathEvidenceRecord): Promise<void>;
 }
 
 export class JsonlEvidenceStore implements EvidenceStore {
   constructor(private readonly baseDir = process.env.EVIDENCE_DIRECTORY ?? 'evidence') {}
 
   async appendSignalEvidence(record: SignalEvidenceRecord): Promise<void> {
-    await appendJsonl(path.join(this.baseDir, 'signals', 'signal-evidence.jsonl'), record);
+    this.appendSignalEvidenceSync(record);
   }
 
   async appendOutcomeEvidence(record: CompletedSignalOutcomeEvidence): Promise<void> {
-    await appendJsonl(path.join(this.baseDir, 'outcomes', 'outcome-evidence.jsonl'), record);
+    this.appendOutcomeEvidenceSync(record);
+  }
+
+  async appendPricePathEvidence(record: SignalPricePathEvidenceRecord): Promise<void> {
+    this.appendPricePathEvidenceSync(record);
+  }
+
+  appendSignalEvidenceSync(record: SignalEvidenceRecord): void {
+    appendJsonlSync(path.join(this.baseDir, 'signals', 'signal-evidence.jsonl'), record);
+  }
+
+  appendOutcomeEvidenceSync(record: CompletedSignalOutcomeEvidence): void {
+    appendJsonlSync(path.join(this.baseDir, 'outcomes', 'outcome-evidence.jsonl'), record);
+  }
+
+  appendPricePathEvidenceSync(record: SignalPricePathEvidenceRecord): void {
+    appendJsonlSync(path.join(this.baseDir, 'price-paths', 'price-path-evidence.jsonl'), record);
   }
 }
 
-async function appendJsonl(filePath: string, record: unknown): Promise<void> {
-  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.promises.appendFile(filePath, `${JSON.stringify(record)}\n`, 'utf8');
+function appendJsonlSync(filePath: string, record: unknown): void {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  fs.appendFileSync(filePath, `${JSON.stringify(record)}\n`, 'utf8');
 }
+
+
