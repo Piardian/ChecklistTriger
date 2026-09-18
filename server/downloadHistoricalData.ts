@@ -90,11 +90,17 @@ function validateCandles(candles: readonly StoredCandle[], timeframe: Timeframe,
     if (c.high < Math.max(c.open, c.close) || c.low > Math.min(c.open, c.close) || c.high < c.low) {
       throw new Error(`Invalid OHLC relationship at index ${i} for ${symbol} ${timeframe}.`);
     }
-    if (c.timestamp % intervalMs !== 0) {
-      throw new Error(`Timestamp ${c.timestamp} is not aligned to ${timeframe} for ${symbol}.`);
+    if (!Number.isInteger(c.timestamp) || c.timestamp <= 0) {
+      throw new Error(`Invalid timestamp ${c.timestamp} for ${symbol} ${timeframe}.`);
     }
-    if (i > 0 && c.timestamp <= candles[i - 1].timestamp) {
-      throw new Error(`Historical candles are not strictly chronological for ${symbol} ${timeframe}.`);
+    if (i > 0) {
+      const delta = c.timestamp - candles[i - 1].timestamp;
+      if (delta <= 0) {
+        throw new Error(`Historical candles are not strictly chronological for ${symbol} ${timeframe}.`);
+      }
+      if (delta < intervalMs) {
+        throw new Error(`Overlapping/duplicate candle interval for ${symbol} ${timeframe} at index ${i}.`);
+      }
     }
   }
 }
