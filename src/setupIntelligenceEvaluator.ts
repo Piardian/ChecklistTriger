@@ -305,7 +305,7 @@ function explainAssessment(
  * The hard grade caps remain downstream in setupQualityRules.ts, so contextual
  * conflicts and POI freshness rules still constrain admission independently.
  */
-function aggregateQuality(values: readonly QualityLevel[]): QualityLevel {
+export function aggregateQuality(values: readonly QualityLevel[]): QualityLevel {
   const rank: Record<QualityLevel, number> = {
     Elite: 5,
     High: 4,
