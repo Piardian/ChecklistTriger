@@ -54,6 +54,7 @@ export interface HistoricalMarketReplayTrade {
   readonly rrAchieved: number | null;
   readonly maximumFavorableExcursion: number | null;
   readonly maximumAdverseExcursion: number | null;
+  readonly sameCandleConflict: boolean;
   readonly evaluatedCandles: number;
   readonly evaluationStartTimestamp: number | null;
   readonly evaluationEndTimestamp: number | null;
@@ -341,6 +342,7 @@ function createReplayTrade(
     rrAchieved: outcome.rrAchieved,
     maximumFavorableExcursion: outcome.maximumFavorableExcursion,
     maximumAdverseExcursion: outcome.maximumAdverseExcursion,
+    sameCandleConflict: outcome.sameCandleConflict,
     evaluatedCandles: outcome.evaluation?.evaluatedCandles ?? 0,
     evaluationStartTimestamp: outcome.evaluation?.evaluationStartTimestamp ?? null,
     evaluationEndTimestamp: outcome.evaluation?.evaluationEndTimestamp ?? null,
