@@ -188,6 +188,7 @@ export function evaluateOutcome(
     const hitTarget = candidate.tradeDirection === 'long'
       ? candle.high >= plan.targetPrice
       : candle.low <= plan.targetPrice;
+    const sameCandleConflict = hitStop && hitTarget;
 
     // OHLC cannot reveal which level was hit first inside a single post-entry candle.
     // Resolve this ambiguity deterministically and conservatively as STOP_LOSS_FIRST.
