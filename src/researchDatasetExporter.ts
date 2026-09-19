@@ -106,6 +106,7 @@ export interface ResearchSignalOutcomeDatasetRow {
   readonly mae: number | null;
   readonly evaluatedCandles: number;
   readonly sameCandleResolution: string;
+  readonly sameCandleConflict: boolean;
 
   // Price Path
   readonly pricePathEvaluatedCount: number | null;
@@ -246,6 +247,7 @@ export function exportResearchDataset(input: ResearchDatasetExportInput): readon
       mae: outcome?.outcome?.maximumAdverseExcursion ?? null,
       evaluatedCandles: outcome?.evaluation?.evaluatedCandles ?? 0,
       sameCandleResolution: outcome?.evaluation?.sameCandleResolution ?? 'STOP_LOSS_FIRST',
+      sameCandleConflict: outcome?.evaluation?.sameCandleConflict ?? false,
 
       pricePathEvaluatedCount: pricePath ? pricePath.points.length : null,
     }));
