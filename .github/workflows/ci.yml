@@ -2,9 +2,9 @@
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "research/historical-ingestion-2026-09" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "audit-fixes-2026-09" ]
 
 jobs:
   build-and-test:

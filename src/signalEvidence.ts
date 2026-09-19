@@ -244,6 +244,7 @@ export interface CompletedSignalOutcomeEvaluationEvidence {
   readonly entryWindowBars: number;
   readonly maxHoldBars: number;
   readonly sameCandleResolution: 'STOP_LOSS_FIRST';
+  readonly sameCandleConflict: boolean;
   readonly entryTriggeredAt: number | null;
   readonly evaluatedCandles: number;
   readonly evaluationStartTimestamp: number;

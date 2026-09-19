@@ -29,6 +29,7 @@ export interface OutcomeTrackingResult {
   readonly rrAchieved: number | null;
   readonly maximumFavorableExcursion: number | null;
   readonly maximumAdverseExcursion: number | null;
+  readonly sameCandleConflict: boolean;
   readonly holdingBars: number | null;
   readonly calendarDurationMs: number | null;
   readonly evaluation: CompletedSignalOutcomeEvaluationEvidence | null;
@@ -187,6 +188,7 @@ export function evaluateOutcome(
     const hitTarget = candidate.tradeDirection === 'long'
       ? candle.high >= plan.targetPrice
       : candle.low <= plan.targetPrice;
+    const sameCandleConflict = hitStop && hitTarget;
 
     // OHLC cannot reveal which level was hit first inside a single post-entry candle.
     // Resolve this ambiguity deterministically and conservatively as STOP_LOSS_FIRST.
@@ -219,7 +221,8 @@ export function evaluateOutcome(
         evaluatedCandles,
         entryIndex,
         exitIndex,
-        pricePath
+        pricePath,
+        sameCandleConflict
       );
     }
 
@@ -305,6 +308,7 @@ export function evaluateOutcome(
     rrAchieved: null,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    sameCandleConflict: false,
     holdingBars: barsAfterEntry.length,
     calendarDurationMs: barsAfterEntry.length > 0
       ? barsAfterEntry[barsAfterEntry.length - 1].timestamp - entryCandle.timestamp
@@ -467,6 +471,7 @@ function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
     rrAchieved: null,
     maximumFavorableExcursion: null,
     maximumAdverseExcursion: null,
+    sameCandleConflict: false,
     holdingBars: null,
     calendarDurationMs: null,
     evaluation: null,
@@ -487,7 +492,8 @@ function completedResult(
   evaluatedCandles: number,
   entryIndex?: number,
   exitIndex?: number,
-  pricePath?: readonly EvaluatedCandlePathPoint[]
+  pricePath?: readonly EvaluatedCandlePathPoint[],
+  sameCandleConflict = false
 ): OutcomeTrackingResult {
   const holdingBars = entryTriggeredAt !== null && exitIndex !== undefined && entryIndex !== undefined
     ? Math.max(0, exitIndex - entryIndex)
@@ -508,6 +514,7 @@ function completedResult(
     entryWindowBars: evaluationPlan.entryWindowBars,
     maxHoldBars: evaluationPlan.maxHoldBars,
     sameCandleResolution: evaluationPlan.sameCandleResolution,
+    sameCandleConflict,
     entryTriggeredAt,
     evaluatedCandles,
     evaluationStartTimestamp,
@@ -526,6 +533,7 @@ function completedResult(
     rrAchieved,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    sameCandleConflict,
     holdingBars,
     calendarDurationMs,
     evaluation,

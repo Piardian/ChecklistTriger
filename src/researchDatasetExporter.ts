@@ -106,6 +106,7 @@ export interface ResearchSignalOutcomeDatasetRow {
   readonly mae: number | null;
   readonly evaluatedCandles: number;
   readonly sameCandleResolution: string;
+  readonly sameCandleConflict: boolean;
 
   // Price Path
   readonly pricePathEvaluatedCount: number | null;
@@ -152,7 +153,7 @@ export function exportResearchDataset(input: ResearchDatasetExportInput): readon
     const outcomeType = outcome?.outcome?.type ?? 'UNRESOLVED';
     const isWin = outcomeType === 'TP';
     const isLoss = outcomeType === 'SL';
-    const isResolved = isWin || isLoss;
+    const isResolved = isWin || isLoss || outcomeType === 'EXPIRED';
 
     const entryTriggered = outcome?.entry?.triggered ?? (outcome?.evaluation?.entryTriggeredAt !== null && outcome?.evaluation?.entryTriggeredAt !== undefined);
     const entryTimestamp = outcome?.entry?.timestamp ?? outcome?.evaluation?.entryTriggeredAt ?? null;
@@ -246,6 +247,7 @@ export function exportResearchDataset(input: ResearchDatasetExportInput): readon
       mae: outcome?.outcome?.maximumAdverseExcursion ?? null,
       evaluatedCandles: outcome?.evaluation?.evaluatedCandles ?? 0,
       sameCandleResolution: outcome?.evaluation?.sameCandleResolution ?? 'STOP_LOSS_FIRST',
+      sameCandleConflict: outcome?.evaluation?.sameCandleConflict ?? false,
 
       pricePathEvaluatedCount: pricePath ? pricePath.points.length : null,
     }));

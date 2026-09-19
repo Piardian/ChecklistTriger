@@ -39,8 +39,8 @@ describe('Twelve Data Client', () => {
     const mockResponse = {
       status: 'ok',
       values: [
-        { datetime: '2026-07-02 09:15:00', open: '1.0500', high: '1.0510', low: '1.0490', close: '1.0505' }, // newest (index 0)
-        { datetime: '2026-07-02 09:00:00', open: '1.0400', high: '1.0410', low: '1.0390', close: '1.0405' }, // oldest (index 1)
+        { datetime: '2026-07-02 09:15:00', open: '1.0500', high: '1.0510', low: '1.0490', close: '1.0505' },
+        { datetime: '2026-07-02 09:00:00', open: '1.0400', high: '1.0410', low: '1.0390', close: '1.0405' },
       ],
     };
 
@@ -52,16 +52,19 @@ describe('Twelve Data Client', () => {
 
     const res = await fetchCandles('EURUSD', '15m', 2);
     expect(res).toHaveLength(2);
-    // Oldest should be first (index 0) due to reverse()
     expect(res[0].timestamp).toBe(new Date('2026-07-02 09:00:00 UTC').getTime());
     expect(res[0].close).toBe(1.0405);
     expect(res[1].timestamp).toBe(new Date('2026-07-02 09:15:00 UTC').getTime());
     expect(res[1].close).toBe(1.0505);
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('https://api.twelvedata.com/time_series?symbol=EUR%2FUSD&interval=15min&outputsize=2'),
+      expect.stringContaining('https://api.twelvedata.com/time_series?'),
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
+    const requestUrl = new URL(mockFetch.mock.calls[0][0] as string);
+    expect(requestUrl.searchParams.get('symbol')).toBe('EUR/USD');
+    expect(requestUrl.searchParams.get('interval')).toBe('15min');
+    expect(requestUrl.searchParams.get('outputsize')).toBe('2');
   });
 
   test('should map native 1m timeframe to TwelveData 1min interval', async () => {
