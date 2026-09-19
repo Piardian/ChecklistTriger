@@ -308,6 +308,7 @@ export function evaluateOutcome(
     rrAchieved: null,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    sameCandleConflict: false,
     holdingBars: barsAfterEntry.length,
     calendarDurationMs: barsAfterEntry.length > 0
       ? barsAfterEntry[barsAfterEntry.length - 1].timestamp - entryCandle.timestamp
