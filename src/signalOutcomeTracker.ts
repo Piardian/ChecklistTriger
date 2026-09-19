@@ -29,6 +29,7 @@ export interface OutcomeTrackingResult {
   readonly rrAchieved: number | null;
   readonly maximumFavorableExcursion: number | null;
   readonly maximumAdverseExcursion: number | null;
+  readonly sameCandleConflict: boolean;
   readonly holdingBars: number | null;
   readonly calendarDurationMs: number | null;
   readonly evaluation: CompletedSignalOutcomeEvaluationEvidence | null;
@@ -219,7 +220,8 @@ export function evaluateOutcome(
         evaluatedCandles,
         entryIndex,
         exitIndex,
-        pricePath
+        pricePath,
+        sameCandleConflict
       );
     }
 
@@ -467,6 +469,7 @@ function waitingResult(plan: OutcomeEvaluationPlan): OutcomeTrackingResult {
     rrAchieved: null,
     maximumFavorableExcursion: null,
     maximumAdverseExcursion: null,
+    sameCandleConflict: false,
     holdingBars: null,
     calendarDurationMs: null,
     evaluation: null,
@@ -487,7 +490,8 @@ function completedResult(
   evaluatedCandles: number,
   entryIndex?: number,
   exitIndex?: number,
-  pricePath?: readonly EvaluatedCandlePathPoint[]
+  pricePath?: readonly EvaluatedCandlePathPoint[],
+  sameCandleConflict = false
 ): OutcomeTrackingResult {
   const holdingBars = entryTriggeredAt !== null && exitIndex !== undefined && entryIndex !== undefined
     ? Math.max(0, exitIndex - entryIndex)
@@ -508,6 +512,7 @@ function completedResult(
     entryWindowBars: evaluationPlan.entryWindowBars,
     maxHoldBars: evaluationPlan.maxHoldBars,
     sameCandleResolution: evaluationPlan.sameCandleResolution,
+    sameCandleConflict,
     entryTriggeredAt,
     evaluatedCandles,
     evaluationStartTimestamp,
@@ -526,6 +531,7 @@ function completedResult(
     rrAchieved,
     maximumFavorableExcursion: mfe,
     maximumAdverseExcursion: mae,
+    sameCandleConflict,
     holdingBars,
     calendarDurationMs,
     evaluation,
