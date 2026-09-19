@@ -152,7 +152,7 @@ export function exportResearchDataset(input: ResearchDatasetExportInput): readon
     const outcomeType = outcome?.outcome?.type ?? 'UNRESOLVED';
     const isWin = outcomeType === 'TP';
     const isLoss = outcomeType === 'SL';
-    const isResolved = isWin || isLoss;
+    const isResolved = isWin || isLoss || outcomeType === 'EXPIRED';
 
     const entryTriggered = outcome?.entry?.triggered ?? (outcome?.evaluation?.entryTriggeredAt !== null && outcome?.evaluation?.entryTriggeredAt !== undefined);
     const entryTimestamp = outcome?.entry?.timestamp ?? outcome?.evaluation?.entryTriggeredAt ?? null;
