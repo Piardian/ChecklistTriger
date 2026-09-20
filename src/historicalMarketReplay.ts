@@ -295,7 +295,12 @@ function defaultCandidateGenerator(
   input: HistoricalMarketReplayCandidateGeneratorInput
 ): readonly NotificationCandidate[] {
   return Object.freeze(
-    runPipeline(input.symbol, input.candleStore, input.notifiedStore)
+    runPipeline(
+      input.symbol,
+      input.candleStore,
+      input.notifiedStore,
+      input.replayTimestamp
+    )
   );
 }
 
