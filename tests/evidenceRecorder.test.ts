@@ -44,7 +44,13 @@ describe('Signal Evidence Recorder', () => {
       eventTimestamp: 2000,
       eventTimeframe: '15m',
       structureScore: 2,
-      swingContext: null,
+      swingContext: {
+        brokenSwingPrice: 1.103,
+        brokenSwingType: 'high',
+        formedAtIndex: 0,
+        confirmedAtIndex: 1,
+        timestamp: 1000,
+      },
     });
     expect(evidence.classification?.strategy).toBe('SWING_BOS_CORE');
     expect(evidence.marketContext?.session).toBeDefined();
