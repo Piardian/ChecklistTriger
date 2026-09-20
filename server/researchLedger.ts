@@ -8,8 +8,9 @@ import type { LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import type { OpposingObstacle } from '../src/opposingObstacleDetector';
 import type { SignalQualityResult } from '../src/signalQualityEngine';
 import type { SetupAssessment } from '../src/setupAssessment';
+import { SMC_ADMISSION_RULEBOOK_VERSION } from '../src/smcAdmissionRulebook';
 
-export const RESEARCH_LEDGER_SCHEMA_VERSION = 1 as const;
+export const RESEARCH_LEDGER_SCHEMA_VERSION = 2 as const;
 export type ResearchEvaluationStage = 'FILTER_REJECTED' | 'GRADED_REJECTED' | 'CONSOLIDATED_REJECTED' | 'CANDIDATE';
 
 export interface ResearchPoiEvaluation {
@@ -51,6 +52,7 @@ export interface ResearchPoiEvaluation {
   readonly rulebook: {
     readonly gradeVersion: string | null;
     readonly setupQualityVersion: string | null;
+    readonly admissionVersion: string;
   };
 }
 
@@ -101,6 +103,7 @@ export function researchPoiInputBase(input: {
   blockingRules: readonly string[];
   stage: ResearchEvaluationStage;
   setupQualityVersion?: string | null;
+  admissionVersion?: string;
 }): Omit<ResearchPoiEvaluation, 'schemaVersion' | 'recordId'> {
   const formedIndex = input.poiType === 'OB'
     ? (input.poi as OrderBlock).formedAtIndex
@@ -128,6 +131,7 @@ export function researchPoiInputBase(input: {
     rulebook: {
       gradeVersion: input.grade?.rulebookVersion ?? null,
       setupQualityVersion: input.setupQualityVersion ?? input.setupAssessmentV2?.decision.rulebookVersion ?? null,
+      admissionVersion: input.admissionVersion ?? SMC_ADMISSION_RULEBOOK_VERSION,
     },
   };
 }
