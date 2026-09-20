@@ -25,7 +25,8 @@ export interface ModelState {
 export function determineModel(
   structureState: StructureState,
   sweepEvents: SweepEvent[],
-  currentIndex: number
+  currentIndex: number,
+  focusEvent?: StructureEvent
 ): ModelState {
   // Filter transitions up to currentIndex
   const validTransitions = (structureState.regimeTransitions || []).filter(
@@ -60,7 +61,10 @@ export function determineModel(
   // Model 1: Range + Sweep
   if (currentTrendAtIdx === 'range') {
     const validSweeps = sweepEvents.filter(
-      s => s.candleIndex >= regimeStartIndex && s.candleIndex <= currentIndex
+      s =>
+        s.candleIndex >= regimeStartIndex &&
+        s.candleIndex <= currentIndex &&
+        (!focusEvent || s.candleIndex <= focusEvent.breakCandleIndex)
     );
 
     if (validSweeps.length > 0) {
@@ -81,7 +85,8 @@ export function determineModel(
         e.type === 'BOS' &&
         e.direction === currentTrendAtIdx &&
         e.breakCandleIndex >= regimeStartIndex &&
-        e.breakCandleIndex <= currentIndex
+        e.breakCandleIndex <= currentIndex &&
+        (!focusEvent || sameStructureEvent(e, focusEvent))
     );
 
     if (validBOS.length > 0) {
@@ -101,4 +106,11 @@ export function determineModel(
     triggeringSweep: null,
     triggeringBOS: null,
   };
+}
+
+function sameStructureEvent(left: StructureEvent, right: StructureEvent): boolean {
+  return left.type === right.type &&
+    left.direction === right.direction &&
+    left.breakCandleIndex === right.breakCandleIndex &&
+    left.breakTimestamp === right.breakTimestamp;
 }
