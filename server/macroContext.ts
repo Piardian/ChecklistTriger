@@ -25,6 +25,10 @@ export interface MacroContext {
   readonly cpiYoY: number | null;
   readonly unemploymentRate: number | null;
   readonly payrollsMoMThousands: number | null;
+  readonly ecbDepositRate: number | null;
+  readonly euroAreaCpiYoY: number | null;
+  readonly us10yRealYield: number | null;
+  readonly vix: number | null;
   readonly seriesCoverage: readonly string[];
 }
 
@@ -35,6 +39,10 @@ const SERIES_IDS = Object.freeze({
   cpi: 'CPIAUCSL',
   unemployment: 'UNRATE',
   payrolls: 'PAYEMS',
+  ecbDepositRate: 'ECBDFR',
+  euroAreaCpi: 'CP0000EZ19M086NEST',
+  us10yRealYield: 'DFII10',
+  vix: 'VIXCLS',
 });
 
 export function loadMacroContext(
@@ -54,6 +62,10 @@ export function loadMacroContext(
     cpiYoY: null,
     unemploymentRate: null,
     payrollsMoMThousands: null,
+    ecbDepositRate: null,
+    euroAreaCpiYoY: null,
+    us10yRealYield: null,
+    vix: null,
     seriesCoverage: [],
   });
 
@@ -78,6 +90,8 @@ export function loadMacroContext(
 
     const cpiObservation = latestBySeries.get(SERIES_IDS.cpi);
     const payrollObservation = latestBySeries.get(SERIES_IDS.payrolls);
+    const euroCpiObservation = latestBySeries.get(SERIES_IDS.euroAreaCpi);
+    const priorEuroCpi = findPriorObservation(observations, SERIES_IDS.euroAreaCpi, euroCpiObservation?.observedAt ?? null, 365);
     const priorCpi = findPriorObservation(observations, SERIES_IDS.cpi, cpiObservation?.observedAt ?? null, 365);
     const priorPayrolls = findPriorObservation(observations, SERIES_IDS.payrolls, payrollObservation?.observedAt ?? null, 31);
 
@@ -99,6 +113,12 @@ export function loadMacroContext(
       cpiYoY: cpiObservation && priorCpi !== null && priorCpi !== 0 ? (cpiObservation.value / priorCpi - 1) * 100 : null,
       unemploymentRate: latestBySeries.get(SERIES_IDS.unemployment)?.value ?? null,
       payrollsMoMThousands: payrollObservation && priorPayrolls !== null ? payrollObservation.value - priorPayrolls : null,
+      ecbDepositRate: latestBySeries.get(SERIES_IDS.ecbDepositRate)?.value ?? null,
+      euroAreaCpiYoY: euroCpiObservation && priorEuroCpi !== null && priorEuroCpi !== 0
+        ? (euroCpiObservation.value / priorEuroCpi - 1) * 100
+        : null,
+      us10yRealYield: latestBySeries.get(SERIES_IDS.us10yRealYield)?.value ?? null,
+      vix: latestBySeries.get(SERIES_IDS.vix)?.value ?? null,
       seriesCoverage,
     };
   } catch {
