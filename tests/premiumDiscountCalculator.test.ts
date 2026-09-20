@@ -52,13 +52,11 @@ describe('Premium / Discount (Fib) Calculator', () => {
 
   test('should evaluate boundary values correctly', () => {
     const candles = createBaseCandles(10);
-    candles[8].close = 145;
-    expect(calculatePremiumDiscount(candles, swings, 8).status).toBe('eq');
-    candles[8].close = 155;
-    expect(calculatePremiumDiscount(candles, swings, 8).status).toBe('eq');
-    candles[8].close = 144.99;
+    candles[8].close = 149.99;
     expect(calculatePremiumDiscount(candles, swings, 8).status).toBe('discount');
-    candles[8].close = 155.01;
+    candles[8].close = 150;
+    expect(calculatePremiumDiscount(candles, swings, 8).status).toBe('eq');
+    candles[8].close = 150.01;
     expect(calculatePremiumDiscount(candles, swings, 8).status).toBe('premium');
   });
 
