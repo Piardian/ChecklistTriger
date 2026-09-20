@@ -103,7 +103,7 @@ describe('Pipeline Orchestrator', () => {
     candles[20].open = 180;
     candles[20].close = 220; // breakout of High 2 (200)
     candles[20].high = 220;
-    candles[20].low = 180;
+    candles[20].low = 195;
 
     // Populate candleStore
     candles.forEach(c => {
@@ -177,7 +177,7 @@ describe('Pipeline Orchestrator', () => {
     candles[20].open = 180;
     candles[20].close = 220;
     candles[20].high = 220;
-    candles[20].low = 180;
+    candles[20].low = 195;
 
     candles.forEach(c => {
       candleStore.appendCandle('EURUSD', '4h', c);
