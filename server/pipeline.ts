@@ -402,6 +402,13 @@ export function runPipeline(
       continue;
     }
 
+    // POI invalidation is an admission gate, not telemetry-only.
+    if (isPoiInvalidated(tradeDirection, ob.low, ob.high, validationCandle.close, symbol)) {
+      reject('poi_invalidated');
+      observePoiLifecycle('OB', ob, formedTimestamp, ['poi_invalidated']);
+      continue;
+    }
+
     // Range, Sweeps, Model
     const modelState = determineModel(structureState15m, sweeps, lastIndex15m, ob.relatedEvent);
 
@@ -587,6 +594,13 @@ export function runPipeline(
       continue;
     }
 
+    // POI invalidation is an admission gate, not telemetry-only.
+    if (isPoiInvalidated(tradeDirection, fvg.gapLow, fvg.gapHigh, validationCandle.close, symbol)) {
+      reject('poi_invalidated');
+      observePoiLifecycle('FVG', fvg, formedTimestamp, ['poi_invalidated']);
+      continue;
+    }
+
     // Range, Sweeps, Model
     const modelState = determineModel(structureState15m, sweeps, lastIndex15m, fvg.relatedEvent);
 
@@ -714,6 +728,19 @@ export function runPipeline(
   }
 
   return finish(consolidateCandidates(candidates));
+}
+
+function isPoiInvalidated(
+  tradeDirection: 'long' | 'short',
+  zoneLow: number,
+  zoneHigh: number,
+  validationClose: number,
+  symbol: string
+): boolean {
+  const tolerance = getPipSize(symbol);
+  return tradeDirection === 'long'
+    ? validationClose < zoneLow - tolerance
+    : validationClose > zoneHigh + tolerance;
 }
 
 function isStructureEventUsable(event: import('../src/types').StructureEvent, currentIndex: number): boolean {
