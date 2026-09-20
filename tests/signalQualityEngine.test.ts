@@ -95,6 +95,7 @@ function buildInput(overrides: Partial<SignalQualityInput> = {}): SignalQualityI
     currentPrice: 1.1005,
     currentTimestamp: Date.UTC(2024, 5, 3, 7, 15, 0),
     poiTestCount: 0,
+    symbol: 'EURUSD',
     ...overrides,
   };
 }
