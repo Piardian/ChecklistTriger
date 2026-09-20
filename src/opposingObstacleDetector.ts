@@ -121,7 +121,7 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
       const maxObstaclePrice = entryTop + clearanceUnits;
       for (const ob of input.activeOrderBlocks1h ?? []) {
         if (ob.direction !== 'bearish' || ob.low <= entryTop || ob.low > maxObstaclePrice) continue;
-        const lifecycle = getLifecycle('OB', ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bearish');
+        const lifecycle = getLifecycle('OB', ob.formedAtIndex, ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bearish');
         if (lifecycle.lifecycle === 'INVALIDATED') continue;
         const dist = Math.round(((ob.low - entryTop) / pip) * 10) / 10;
         return { hasObstacle: true, obstacleType: 'OB', timeframe: '1h', level: { low: ob.low, high: ob.high }, distancePips: dist, ...lifecycle,
@@ -129,7 +129,7 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
       }
       for (const fvg of input.activeFVGs1h ?? []) {
         if (fvg.direction !== 'bearish' || fvg.gapLow <= entryTop || fvg.gapLow > maxObstaclePrice) continue;
-        const lifecycle = getLifecycle('FVG', fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bearish');
+        const lifecycle = getLifecycle('FVG', fvg.middleCandleIndex, fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bearish');
         if (lifecycle.lifecycle === 'INVALIDATED') continue;
         const dist = Math.round(((fvg.gapLow - entryTop) / pip) * 10) / 10;
         return { hasObstacle: true, obstacleType: 'FVG', timeframe: '1h', level: { low: fvg.gapLow, high: fvg.gapHigh }, distancePips: dist, ...lifecycle,
@@ -140,7 +140,7 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
       const minObstaclePrice = entryBottom - clearanceUnits;
       for (const ob of input.activeOrderBlocks1h ?? []) {
         if (ob.direction !== 'bullish' || ob.high >= entryBottom || ob.high < minObstaclePrice) continue;
-        const lifecycle = getLifecycle('OB', ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bullish');
+        const lifecycle = getLifecycle('OB', ob.formedAtIndex, ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bullish');
         if (lifecycle.lifecycle === 'INVALIDATED') continue;
         const dist = Math.round(((entryBottom - ob.high) / pip) * 10) / 10;
         return { hasObstacle: true, obstacleType: 'OB', timeframe: '1h', level: { low: ob.low, high: ob.high }, distancePips: dist, ...lifecycle,
@@ -148,7 +148,7 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
       }
       for (const fvg of input.activeFVGs1h ?? []) {
         if (fvg.direction !== 'bullish' || fvg.gapHigh >= entryBottom || fvg.gapHigh < minObstaclePrice) continue;
-        const lifecycle = getLifecycle('FVG', fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bullish');
+        const lifecycle = getLifecycle('FVG', fvg.middleCandleIndex, fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bullish');
         if (lifecycle.lifecycle === 'INVALIDATED') continue;
         const dist = Math.round(((entryBottom - fvg.gapHigh) / pip) * 10) / 10;
         return { hasObstacle: true, obstacleType: 'FVG', timeframe: '1h', level: { low: fvg.gapLow, high: fvg.gapHigh }, distancePips: dist, ...lifecycle,
