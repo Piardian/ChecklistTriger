@@ -8,7 +8,6 @@ import type { LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import type { OpposingObstacle } from '../src/opposingObstacleDetector';
 import type { SignalQualityResult } from '../src/signalQualityEngine';
 import type { SetupAssessment } from '../src/setupAssessment';
-import type { MacroContext } from './macroContext';
 
 export const RESEARCH_LEDGER_SCHEMA_VERSION = 1 as const;
 export type ResearchEvaluationStage = 'FILTER_REJECTED' | 'GRADED_REJECTED' | 'CANDIDATE';
@@ -48,7 +47,6 @@ export interface ResearchPoiEvaluation {
     readonly grade: GradeResult | null;
     readonly signalQuality: SignalQualityResult | null;
     readonly setupAssessmentV2: SetupAssessment | null;
-    readonly macroContext: MacroContext;
   };
   readonly rulebook: {
     readonly gradeVersion: string | null;
@@ -100,7 +98,6 @@ export function researchPoiInputBase(input: {
   grade: GradeResult | null;
   signalQuality: SignalQualityResult | null;
   setupAssessmentV2: SetupAssessment | null;
-  macroContext: MacroContext;
   blockingRules: readonly string[];
   stage: ResearchEvaluationStage;
   setupQualityVersion?: string | null;
@@ -126,7 +123,7 @@ export function researchPoiInputBase(input: {
       oppositeStructureEventsSinceOrigin: input.oppositeStructureEventsSinceOrigin, displacement: input.displacement,
       modelState: input.modelState, triggeringSweep: input.triggeringSweep, liquidityMagnet: input.liquidityMagnet,
       opposingObstacle: input.opposingObstacle, grade: input.grade, signalQuality: input.signalQuality,
-      setupAssessmentV2: input.setupAssessmentV2, macroContext: input.macroContext,
+      setupAssessmentV2: input.setupAssessmentV2,
     },
     rulebook: {
       gradeVersion: input.grade?.rulebookVersion ?? null,
