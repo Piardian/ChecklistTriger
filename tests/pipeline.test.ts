@@ -270,7 +270,10 @@ function appendPipelineCandles(
   candles15m[8].high = 90;
   candles15m[12].low = 80;
   candles15m[16].high = 100;
+  candles15m[14].high = 95;
+  candles15m[14].low = 90;
   candles15m[15].high = 97;
+  candles15m[15].low = 92;
   candles15m[17] = {
     timestamp: candles15m[17].timestamp,
     open: 99,
