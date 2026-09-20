@@ -7,6 +7,9 @@ export interface OpposingObstacle {
   timeframe: '15m' | '1h';
   level: { low: number; high: number } | null;
   distancePips: number;
+  lifecycle: 'ACTIVE' | 'MITIGATED' | 'INVALIDATED' | 'NONE';
+  firstMitigationAt: number | null;
+  invalidatedAt: number | null;
   warningText: string;
 }
 
@@ -18,6 +21,10 @@ export interface ObstacleCheckInput {
   activeFVGs15m: readonly FVG[];
   activeOrderBlocks1h?: readonly OrderBlock[];
   activeFVGs1h?: readonly FVG[];
+  candles15m?: readonly { high: number; low: number; close: number; timestamp: number }[];
+  candles1h?: readonly { high: number; low: number; close: number; timestamp: number }[];
+  currentIndex15m?: number;
+  currentIndex1h?: number;
   minClearancePips?: number;
 }
 
@@ -46,6 +53,9 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
     timeframe: '15m',
     level: null,
     distancePips: 0,
+    lifecycle: 'NONE',
+    firstMitigationAt: null,
+    invalidatedAt: null,
     warningText: '',
   };
 
