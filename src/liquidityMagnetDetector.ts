@@ -129,7 +129,9 @@ function findTakenAt(
   currentIndex: number | undefined
 ): number | null {
   if (!candles || currentIndex === undefined) return null;
-  const startIndex = Math.max(...cluster.map(point => point.confirmedAtIndex));
+  // The cluster becomes structurally possible once all source swings have formed.
+  // Use the latest formation index so a later confirmation cannot hide an earlier take.
+  const startIndex = Math.max(...cluster.map(point => point.formedAtIndex));
   for (let index = startIndex + 1; index <= currentIndex && index < candles.length; index += 1) {
     if (type === 'EQH' && candles[index].high >= priceLevel) return candles[index].timestamp;
     if (type === 'EQL' && candles[index].low <= priceLevel) return candles[index].timestamp;
