@@ -26,7 +26,6 @@ import { consolidateCandidates } from '../src/poiConsolidator';
 import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
 import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
-import { loadMacroContext } from './macroContext';
 
 export interface NotificationCandidate {
   symbol: Symbol;
@@ -58,7 +57,6 @@ export interface NotificationCandidate {
   admissionProfile?: 'PRODUCTION' | 'PVP_ACCELERATION';
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
-  macroContext?: import('./macroContext').MacroContext;
   modelState?: ModelState | null;
 }
 
@@ -217,7 +215,6 @@ export function runPipeline(
     calculateRange(candles15mCast, swings15m, structureState15m, idx)
   );
   const sweeps = detectSweeps(candles15mCast, rangeStates, symbol, '15m');
-  const researchMacroContext = loadMacroContext(candles15mCast[lastIndex15m].timestamp);
 
   const candidates: NotificationCandidate[] = [];
 
@@ -341,7 +338,6 @@ export function runPipeline(
       grade: gradeResult ?? null,
       signalQuality: signalQuality ?? null,
       setupAssessmentV2: setupAssessmentV2 ?? null,
-      macroContext: researchMacroContext,
       blockingRules,
       stage: candidateEligible ? 'CANDIDATE' : gradeResult ? 'GRADED_REJECTED' : 'FILTER_REJECTED',
       setupQualityVersion: setupAssessmentV2?.decision.rulebookVersion ?? null,
@@ -522,8 +518,7 @@ export function runPipeline(
         admissionProfile: admissionProfile(),
         liquidityMagnet,
         opposingObstacle,
-        macroContext: researchMacroContext,
-        modelState,
+          modelState,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
@@ -708,8 +703,7 @@ export function runPipeline(
         admissionProfile: admissionProfile(),
         liquidityMagnet,
         opposingObstacle,
-        macroContext: researchMacroContext,
-      });
+        });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
       recordSingleRuleAblation(gradeResult);
