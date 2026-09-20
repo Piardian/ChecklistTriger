@@ -138,7 +138,7 @@ describe('Displacement Quality Scorer', () => {
     for (let i = 5; i <= 7; i++) {
       candles[i] = { timestamp: i * 1000, open: 1.0492, high: 1.0507, low: 1.0492, close: 1.0505 };
     }
-    candles[7].low = 1.0509; // Valid raw gap centered on i=6: 2 pips (< 5 pips)
+    candles[7] = { timestamp: 7000, open: 1.0509, high: 1.0529, low: 1.0509, close: 1.0527 }; // Valid OHLC + raw gap centered on i=6
     
     let result = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
     expect(result!.totalScore).toBe(3.5);
