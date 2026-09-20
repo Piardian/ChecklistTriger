@@ -1,5 +1,7 @@
 import { Candle, SwingPoint, PremiumDiscountState } from './types';
 
+export const PREMIUM_DISCOUNT_THRESHOLD = 0.5 as const;
+
 /**
  * Calculates Premium/Discount (Fib) status from the latest confirmed dealing range.
  *
@@ -76,9 +78,9 @@ export function calculatePremiumDiscount(
   const fibValue = (currentPrice - rangeLow) / (rangeHigh - rangeLow);
 
   let status: 'premium' | 'discount' | 'eq';
-  if (fibValue > 0.55) {
+  if (fibValue > PREMIUM_DISCOUNT_THRESHOLD) {
     status = 'premium';
-  } else if (fibValue < 0.45) {
+  } else if (fibValue < PREMIUM_DISCOUNT_THRESHOLD) {
     status = 'discount';
   } else {
     status = 'eq';
