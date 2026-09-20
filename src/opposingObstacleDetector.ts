@@ -217,39 +217,39 @@ function find1hLongObstacle(
   maxObstaclePrice: number,
   pip: number
 ): OpposingObstacle | null {
+  const candidates: ObstacleCandidate[] = [];
+
   for (const ob of input.activeOrderBlocks1h ?? []) {
     if (ob.direction !== 'bearish' || ob.low <= entryTop || ob.low > maxObstaclePrice) continue;
     const lifecycle = getLifecycle(ob.formedAtIndex, ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bearish');
     if (lifecycle.lifecycle !== 'ACTIVE') continue;
-    const dist = roundPips((ob.low - entryTop) / pip);
-    return {
-      hasObstacle: true,
+    candidates.push({
       obstacleType: 'OB',
       timeframe: '1h',
       level: { low: ob.low, high: ob.high },
-      distancePips: dist,
-      ...lifecycle,
-      warningText: 'Karsi Engel: ' + dist + ' pip yukarida 1H Bearish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')',
-    };
+      distancePips: roundPips((ob.low - entryTop) / pip),
+      formedAtIndex: ob.formedAtIndex,
+      direction: 'bearish',
+      lifecycle,
+    });
   }
 
   for (const fvg of input.activeFVGs1h ?? []) {
     if (fvg.direction !== 'bearish' || fvg.gapLow <= entryTop || fvg.gapLow > maxObstaclePrice) continue;
     const lifecycle = getLifecycle(fvg.middleCandleIndex, fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bearish');
     if (lifecycle.lifecycle !== 'ACTIVE') continue;
-    const dist = roundPips((fvg.gapLow - entryTop) / pip);
-    return {
-      hasObstacle: true,
+    candidates.push({
       obstacleType: 'FVG',
       timeframe: '1h',
       level: { low: fvg.gapLow, high: fvg.gapHigh },
-      distancePips: dist,
-      ...lifecycle,
-      warningText: 'Karsi Engel: ' + dist + ' pip yukarida 1H Bearish FVG mevcut (' + fvg.gapLow.toFixed(4) + ' - ' + fvg.gapHigh.toFixed(4) + ')',
-    };
+      distancePips: roundPips((fvg.gapLow - entryTop) / pip),
+      formedAtIndex: fvg.middleCandleIndex,
+      direction: 'bearish',
+      lifecycle,
+    });
   }
 
-  return null;
+  return selectNearestActiveObstacle(candidates, input);
 }
 
 function find1hShortObstacle(
@@ -258,39 +258,39 @@ function find1hShortObstacle(
   minObstaclePrice: number,
   pip: number
 ): OpposingObstacle | null {
+  const candidates: ObstacleCandidate[] = [];
+
   for (const ob of input.activeOrderBlocks1h ?? []) {
     if (ob.direction !== 'bullish' || ob.high >= entryBottom || ob.high < minObstaclePrice) continue;
     const lifecycle = getLifecycle(ob.formedAtIndex, ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bullish');
     if (lifecycle.lifecycle !== 'ACTIVE') continue;
-    const dist = roundPips((entryBottom - ob.high) / pip);
-    return {
-      hasObstacle: true,
+    candidates.push({
       obstacleType: 'OB',
       timeframe: '1h',
       level: { low: ob.low, high: ob.high },
-      distancePips: dist,
-      ...lifecycle,
-      warningText: 'Karsi Engel: ' + dist + ' pip asagida 1H Bullish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')',
-    };
+      distancePips: roundPips((entryBottom - ob.high) / pip),
+      formedAtIndex: ob.formedAtIndex,
+      direction: 'bullish',
+      lifecycle,
+    });
   }
 
   for (const fvg of input.activeFVGs1h ?? []) {
     if (fvg.direction !== 'bullish' || fvg.gapHigh >= entryBottom || fvg.gapHigh < minObstaclePrice) continue;
     const lifecycle = getLifecycle(fvg.middleCandleIndex, fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bullish');
     if (lifecycle.lifecycle !== 'ACTIVE') continue;
-    const dist = roundPips((entryBottom - fvg.gapHigh) / pip);
-    return {
-      hasObstacle: true,
+    candidates.push({
       obstacleType: 'FVG',
       timeframe: '1h',
       level: { low: fvg.gapLow, high: fvg.gapHigh },
-      distancePips: dist,
-      ...lifecycle,
-      warningText: 'Karsi Engel: ' + dist + ' pip asagida 1H Bullish FVG mevcut (' + fvg.gapLow.toFixed(4) + ' - ' + fvg.gapHigh.toFixed(4) + ')',
-    };
+      distancePips: roundPips((entryBottom - fvg.gapHigh) / pip),
+      formedAtIndex: fvg.middleCandleIndex,
+      direction: 'bullish',
+      lifecycle,
+    });
   }
 
-  return null;
+  return selectNearestActiveObstacle(candidates, input);
 }
 
 function getLifecycle(
