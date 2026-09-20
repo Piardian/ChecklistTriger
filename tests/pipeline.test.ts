@@ -5,6 +5,7 @@ import { NotifiedStore } from '../server/notifiedStore';
 import { runPipeline } from '../server/pipeline';
 import { Candle, SwingPoint } from '../src/types';
 import * as scorerModule from '../src/displacementQualityScorer';
+import * as telemetryModule from '../server/telemetry';
 
 describe('Pipeline Orchestrator', () => {
   const testDir = path.join(__dirname, 'temp_pipeline_test');
@@ -110,8 +111,13 @@ describe('Pipeline Orchestrator', () => {
 
     // Use a deterministic observation time so the 48-hour POI TTL is evaluated against the fixture, not wall-clock time.
     const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
-    // First run should trigger notifications
+    // First run should trigger notifications.
+    const filterTelemetry = jest.spyOn(telemetryModule, 'recordPipelineFilterTelemetry');
     const res1 = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
+    if (res1.length === 0) {
+      console.log('[PIPELINE_DIAGNOSTIC] ' + JSON.stringify(filterTelemetry.mock.calls.map(call => call[0])));
+    }
+    filterTelemetry.mockRestore();
     expect(res1.length).toBeGreaterThan(0);
     expect(res1[0].gradeResult.entryAllowed).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(res1[0], 'signalQualityResult')).toBe(false);
@@ -180,7 +186,12 @@ describe('Pipeline Orchestrator', () => {
     appendPipelineCandles(candleStore, 'EURUSD', candles);
 
     const analysisTimestamp = Date.UTC(2024, 5, 3, 12, 0, 0);
+    const filterTelemetry = jest.spyOn(telemetryModule, 'recordPipelineFilterTelemetry');
     const res = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
+    if (res.length === 0) {
+      console.log('[PIPELINE_DIAGNOSTIC_SIGNAL_QUALITY] ' + JSON.stringify(filterTelemetry.mock.calls.map(call => call[0])));
+    }
+    filterTelemetry.mockRestore();
 
     expect(res.length).toBeGreaterThan(0);
     expect(res[0].signalQualityResult?.version).toBe(1);
@@ -257,7 +268,12 @@ describe('Pipeline Orchestrator', () => {
     });
 
     const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
+    const filterTelemetry = jest.spyOn(telemetryModule, 'recordPipelineFilterTelemetry');
     const res = runPipeline('GBPUSD', candleStore, notifiedStore, analysisTimestamp);
+    if (res.length === 0) {
+      console.log('[PIPELINE_DIAGNOSTIC_DISPLACEMENT] ' + JSON.stringify(filterTelemetry.mock.calls.map(call => call[0])));
+    }
+    filterTelemetry.mockRestore();
     expect(res.length).toBeGreaterThan(0);
 
     mockDq.mockRestore();
