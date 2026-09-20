@@ -36,6 +36,24 @@ describe('Liquidity Magnet Detector (EQH / EQL)', () => {
     expect(magnet?.description).toContain('EQL');
   });
 
+  it('selects the nearest active equal-high cluster instead of the first detected cluster', () => {
+    const swings: SwingPoint[] = [
+      { type: 'high', price: 1.0600, formedAtIndex: 10, confirmedAtIndex: 12, timestamp: 1000 },
+      { type: 'high', price: 1.0601, formedAtIndex: 12, confirmedAtIndex: 14, timestamp: 2000 },
+      { type: 'low', price: 1.0550, formedAtIndex: 15, confirmedAtIndex: 17, timestamp: 3000 },
+      { type: 'high', price: 1.0560, formedAtIndex: 18, confirmedAtIndex: 20, timestamp: 4000 },
+      { type: 'high', price: 1.0561, formedAtIndex: 21, confirmedAtIndex: 23, timestamp: 5000 },
+    ];
+
+    const magnet = detectLiquidityMagnet(swings, 1.0500, 'long', 'EURUSD');
+
+    expect(magnet).not.toBeNull();
+    expect(magnet?.type).toBe('EQH');
+    expect(magnet?.priceLevel).toBeCloseTo(1.05605, 5);
+    expect(magnet?.distancePips).toBeCloseTo(60.5, 0.5);
+  });
+
+
   it('returns null when swings are too dispersed to be equal', () => {
     const swings: SwingPoint[] = [
       { type: 'high', price: 1.0550, formedAtIndex: 10, confirmedAtIndex: 12, timestamp: 1000 },
