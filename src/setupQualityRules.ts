@@ -115,7 +115,7 @@ export const SETUP_QUALITY_RULES: readonly QualityRule[] = [
     maxGrade: 'B+',
     message: 'POI quality is neutral or weak.',
     recommendation: 'Cap the setup until POI quality is confirmed by freshness and reaction logic.',
-    condition: ({ detector }) => detector.poi.testCount !== 1,
+    condition: ({ detector }) => detector.poi.testCount >= 1,
   },
   {
     id: 'OVERTESTED_POI',
