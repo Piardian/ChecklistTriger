@@ -168,6 +168,7 @@ export interface SignalEvidenceRecord {
   };
   readonly model: {
     readonly modelState: 'confirmed' | 'weak' | 'missing';
+    readonly modelType?: 'model1_reversal' | 'model2_continuation' | 'none';
     readonly admissionProfile: string;
   };
   readonly grade: {
