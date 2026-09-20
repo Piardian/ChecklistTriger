@@ -71,4 +71,60 @@ describe('Opposing Obstacle Detector', () => {
     expect(result.hasObstacle).toBe(false);
     expect(result.obstacleType).toBeNull();
   });
+  it('does not treat a mitigated 15M obstacle as an active blocker', () => {
+    const ob: OrderBlock = {
+      direction: 'bearish',
+      candleIndex: 1,
+      high: 1.0535,
+      low: 1.0525,
+      formedAtIndex: 1,
+      relatedEvent: {} as any,
+    };
+
+    const candles = [
+      { timestamp: 0, high: 1.0500, low: 1.0490, close: 1.0495 },
+      { timestamp: 1, high: 1.0530, low: 1.0520, close: 1.0528 },
+      { timestamp: 2, high: 1.0530, low: 1.0526, close: 1.0528 },
+    ];
+
+    const result = detectOpposingObstacle({
+      symbol: 'EURUSD',
+      tradeDirection: 'long',
+      entryZone: { low: 1.0500, high: 1.0510 },
+      activeOrderBlocks15m: [ob],
+      activeFVGs15m: [],
+      candles15m: candles,
+      currentIndex15m: 2,
+      minClearancePips: 25,
+    });
+
+    expect(result.hasObstacle).toBe(false);
+  });
+
+  it('falls back to an active 1H obstacle when the 15M path is clear', () => {
+    const ob: OrderBlock = {
+      direction: 'bearish',
+      candleIndex: 1,
+      high: 1.0535,
+      low: 1.0525,
+      formedAtIndex: 1,
+      relatedEvent: {} as any,
+    };
+
+    const result = detectOpposingObstacle({
+      symbol: 'EURUSD',
+      tradeDirection: 'long',
+      entryZone: { low: 1.0500, high: 1.0510 },
+      activeOrderBlocks15m: [],
+      activeFVGs15m: [],
+      activeOrderBlocks1h: [ob],
+      activeFVGs1h: [],
+      minClearancePips: 25,
+    });
+
+    expect(result.hasObstacle).toBe(true);
+    expect(result.timeframe).toBe('1h');
+    expect(result.lifecycle).toBe('ACTIVE');
+  });
+
 });
