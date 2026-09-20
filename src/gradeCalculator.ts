@@ -193,13 +193,13 @@ export function calculateGrade(input: GradeInput): GradeResult {
       (input.tradeDirection === 'long' && input.pd15M.status === 'premium') ||
       (input.tradeDirection === 'short' && input.pd15M.status === 'discount');
     if (is15MOpposite) {
-      totalScore -= 1;
+      totalScore -= GRADE_RULES.scoring.fifteenMinuteOppositePdPenalty;
     }
   }
 
   // Liquidity Magnet Bonus (+1) if active
   if (input.liquidityMagnet && input.liquidityMagnet.isActive && totalScore < 9) {
-    totalScore += 1;
+    totalScore += GRADE_RULES.scoring.liquidityMagnetBonus;
   }
 
   let grade: 'A+' | 'A' | 'B+' | 'B' | 'C';
