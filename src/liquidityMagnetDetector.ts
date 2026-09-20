@@ -7,6 +7,9 @@ export interface LiquidityMagnet {
   pointsCount: number;
   distancePips: number;
   isActive: boolean;
+  status: 'ACTIVE' | 'TAKEN' | 'INVALIDATED';
+  firstTakenAt: number | null;
+  sourceSwingTimestamps: readonly number[];
   description: string;
 }
 function getTolerance(symbol: string, refPrice: number): number {
@@ -29,7 +32,9 @@ export function detectLiquidityMagnet(
   swings: readonly SwingPoint[],
   currentPrice: number,
   tradeDirection: 'long' | 'short',
-  symbol: string
+  symbol: string,
+  candles?: readonly { high: number; low: number; timestamp: number }[],
+  currentIndex?: number
 ): LiquidityMagnet | null {
   if (!swings || swings.length < 2) return null;
 
@@ -51,12 +56,16 @@ export function detectLiquidityMagnet(
       if (cluster.length >= 2) {
         const avgPrice = cluster.reduce((sum, s) => sum + s.price, 0) / cluster.length;
         const distancePips = Math.round(((avgPrice - currentPrice) / pip) * 10) / 10;
+        const firstTakenAt = findTakenAt('EQH', avgPrice, cluster, candles, currentIndex);
         return {
           type: 'EQH',
           priceLevel: avgPrice,
           pointsCount: cluster.length,
           distancePips,
-          isActive: true,
+          isActive: firstTakenAt === null,
+          status: firstTakenAt === null ? 'ACTIVE' : 'TAKEN',
+          firstTakenAt,
+          sourceSwingTimestamps: cluster.map(point => point.timestamp),
           description: `EQH (Esit Tepeler - BSL Miknatisi): ${cluster.length} tepe @ ${avgPrice.toFixed(4)} (${distancePips} pip yukarida)`,
         };
       }
@@ -76,17 +85,37 @@ export function detectLiquidityMagnet(
       if (cluster.length >= 2) {
         const avgPrice = cluster.reduce((sum, s) => sum + s.price, 0) / cluster.length;
         const distancePips = Math.round(((currentPrice - avgPrice) / pip) * 10) / 10;
+        const firstTakenAt = findTakenAt('EQL', avgPrice, cluster, candles, currentIndex);
         return {
           type: 'EQL',
           priceLevel: avgPrice,
           pointsCount: cluster.length,
           distancePips,
-          isActive: true,
+          isActive: firstTakenAt === null,
+          status: firstTakenAt === null ? 'ACTIVE' : 'TAKEN',
+          firstTakenAt,
+          sourceSwingTimestamps: cluster.map(point => point.timestamp),
           description: `EQL (Esit Dipler - SSL Miknatisi): ${cluster.length} dip @ ${avgPrice.toFixed(4)} (${distancePips} pip asagida)`,
         };
       }
     }
   }
 
+  return null;
+}
+
+function findTakenAt(
+  type: 'EQH' | 'EQL',
+  priceLevel: number,
+  cluster: readonly SwingPoint[],
+  candles: readonly { high: number; low: number; timestamp: number }[] | undefined,
+  currentIndex: number | undefined
+): number | null {
+  if (!candles || currentIndex === undefined) return null;
+  const startIndex = Math.max(...cluster.map(point => point.confirmedAtIndex));
+  for (let index = startIndex + 1; index <= currentIndex && index < candles.length; index += 1) {
+    if (type === 'EQH' && candles[index].high >= priceLevel) return candles[index].timestamp;
+    if (type === 'EQL' && candles[index].low <= priceLevel) return candles[index].timestamp;
+  }
   return null;
 }
