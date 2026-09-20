@@ -739,7 +739,7 @@ function isStructureEventUsable(event: import('../src/types').StructureEvent, cu
     Number.isFinite(event.breakClosePrice);
 }
 
-function filterClosedCandles(
+export function filterClosedCandles(
   candles: readonly Candle[],
   candleDurationMs: number,
   analysisTimestamp: number
