@@ -105,12 +105,8 @@ describe('Pipeline Orchestrator', () => {
     candles[20].high = 220;
     candles[20].low = 195;
 
-    // Populate candleStore
-    candles.forEach(c => {
-      candleStore.appendCandle('EURUSD', '4h', c);
-      candleStore.appendCandle('EURUSD', '1h', c);
-      candleStore.appendCandle('EURUSD', '15m', c);
-    });
+    // Populate candleStore with separate 4H/1H context and 15M execution structure.
+    appendPipelineCandles(candleStore, 'EURUSD', candles);
 
     // First run should trigger notifications
     const res1 = runPipeline('EURUSD', candleStore, notifiedStore);
@@ -175,15 +171,11 @@ describe('Pipeline Orchestrator', () => {
     candles[19].high = 180;
     candles[19].low = 150;
     candles[20].open = 180;
-    candles[20].close = 220;
-    candles[20].high = 220;
-    candles[20].low = 195;
+    candles[20].close = 110;
+    candles[20].high = 110;
+    candles[20].low = 97;
 
-    candles.forEach(c => {
-      candleStore.appendCandle('EURUSD', '4h', c);
-      candleStore.appendCandle('EURUSD', '1h', c);
-      candleStore.appendCandle('EURUSD', '15m', c);
-    });
+    appendPipelineCandles(candleStore, 'EURUSD', candles);
 
     const res = runPipeline('EURUSD', candleStore, notifiedStore);
 
@@ -246,13 +238,9 @@ describe('Pipeline Orchestrator', () => {
 
     candles[18].open = 120; candles[18].close = 150; candles[18].high = 150; candles[18].low = 120;
     candles[19].open = 150; candles[19].close = 180; candles[19].high = 180; candles[19].low = 150;
-    candles[20].open = 180; candles[20].close = 220; candles[20].high = 220; candles[20].low = 180;
+    candles[20].open = 180; candles[20].close = 110; candles[20].high = 110; candles[20].low = 97;
 
-    candles.forEach(c => {
-      candleStore.appendCandle('GBPUSD', '4h', c);
-      candleStore.appendCandle('GBPUSD', '1h', c);
-      candleStore.appendCandle('GBPUSD', '15m', c);
-    });
+    appendPipelineCandles(candleStore, 'GBPUSD', candles);
 
     const mockDq = jest.spyOn(scorerModule, 'scoreDisplacementQuality').mockReturnValue({
       legDirection: 'bullish',
@@ -271,3 +259,59 @@ describe('Pipeline Orchestrator', () => {
     mockDq.mockRestore();
   });
 });
+
+function appendPipelineCandles(
+  candleStore: CandleStore,
+  symbol: 'EURUSD' | 'GBPUSD',
+  candles15m: Candle[]
+): void {
+  // The 15M fixture creates the local bullish BOS/OB.
+  candles15m[4].low = 50;
+  candles15m[8].high = 90;
+  candles15m[12].low = 80;
+  candles15m[16].high = 100;
+  candles15m[15].high = 97;
+  candles15m[17] = {
+    timestamp: candles15m[17].timestamp,
+    open: 99,
+    high: 99.5,
+    low: 90,
+    close: 95,
+  };
+  candles15m[18] = {
+    timestamp: candles15m[18].timestamp,
+    open: 95,
+    high: 98,
+    low: 94.5,
+    close: 97,
+  };
+  candles15m[19] = {
+    timestamp: candles15m[19].timestamp,
+    open: 97,
+    high: 99,
+    low: 96.5,
+    close: 98,
+  };
+  candles15m[20] = {
+    timestamp: candles15m[20].timestamp,
+    open: 98,
+    high: 110,
+    low: 97,
+    close: 110,
+  };
+
+  // 4H/1H context stays bullish, but current price remains in 4H Discount.
+  const contextCandles = candles15m.map(candle => ({ ...candle }));
+  contextCandles[4].low = 50;
+  contextCandles[8].high = 150;
+  contextCandles[12].low = 80;
+  contextCandles[16].high = 200;
+  contextCandles[13].close = 85;
+  contextCandles[20].close = 110;
+
+  contextCandles.forEach(candle => {
+    candleStore.appendCandle(symbol, '4h', candle);
+    candleStore.appendCandle(symbol, '1h', candle);
+  });
+  candles15m.forEach(candle => candleStore.appendCandle(symbol, '15m', candle));
+}
