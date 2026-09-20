@@ -54,6 +54,34 @@ describe('Liquidity Magnet Detector (EQH / EQL)', () => {
   });
 
 
+
+  it('marks an equal-high cluster as taken when liquidity was breached after formation but before late confirmation', () => {
+    const swings: SwingPoint[] = [
+      { type: 'high', price: 1.0550, formedAtIndex: 10, confirmedAtIndex: 12, timestamp: 1000 },
+      { type: 'high', price: 1.0551, formedAtIndex: 20, confirmedAtIndex: 25, timestamp: 2000 },
+    ];
+    const candles = Array.from({ length: 31 }, (_, index) => ({
+      timestamp: index * 1000,
+      high: 1.0530,
+      low: 1.0510,
+    }));
+    candles[21].high = 1.0560; // Liquidity is taken before the second swing is confirmed.
+
+    const magnet = detectLiquidityMagnet(
+      swings,
+      1.0520,
+      'long',
+      'EURUSD',
+      candles,
+      30
+    );
+
+    expect(magnet).not.toBeNull();
+    expect(magnet?.isActive).toBe(false);
+    expect(magnet?.status).toBe('TAKEN');
+    expect(magnet?.firstTakenAt).toBe(21000);
+  });
+
   it('returns null when swings are too dispersed to be equal', () => {
     const swings: SwingPoint[] = [
       { type: 'high', price: 1.0550, formedAtIndex: 10, confirmedAtIndex: 12, timestamp: 1000 },
