@@ -228,6 +228,7 @@ export function runPipeline(
     candidateEligible = false,
     poiIntegrity?: GradeResult['poiIntegrity'],
     gradeResult?: GradeResult,
+    setupAssessmentV2?: SetupAssessment,
   ): void => {
     const zone = poiType === 'OB'
       ? { low: (poi as OrderBlock).low, high: (poi as OrderBlock).high }
@@ -337,11 +338,11 @@ export function runPipeline(
       opposingObstacle,
       grade: gradeResult ?? null,
       signalQuality: signalQuality ?? null,
-      setupAssessmentV2: null,
+      setupAssessmentV2: setupAssessmentV2 ?? null,
       macroContext: researchMacroContext,
       blockingRules,
       stage: candidateEligible ? 'CANDIDATE' : gradeResult ? 'GRADED_REJECTED' : 'FILTER_REJECTED',
-      setupQualityVersion: gradeResult ? null : null,
+      setupQualityVersion: setupAssessmentV2?.decision.rulebookVersion ?? null,
     }));
   };
 
@@ -451,7 +452,6 @@ export function runPipeline(
 
     const gradeResult = calculateGrade(gradeInput);
     if (productionOrPvpAdmission(gradeResult.entryAllowed, gradeResult.totalScore)) {
-      observePoiLifecycle('OB', ob, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult);
       const signalQualityResult = maybeEvaluateSignalQuality({
         poiType: 'OB',
         poi: ob,
@@ -481,6 +481,7 @@ export function runPipeline(
         sweeps: modelState.triggeringSweep ? [modelState.triggeringSweep] : [],
       });
       const setupAssessmentComparison = compareV1GradeWithV2Assessment(gradeResult, setupAssessmentV2);
+      observePoiLifecycle('OB', ob, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult, setupAssessmentV2);
 
       candidates.push({
         symbol,
@@ -635,7 +636,6 @@ export function runPipeline(
 
     const gradeResult = calculateGrade(gradeInput);
     if (productionOrPvpAdmission(gradeResult.entryAllowed, gradeResult.totalScore)) {
-      observePoiLifecycle('FVG', fvg, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult);
       const signalQualityResult = maybeEvaluateSignalQuality({
         poiType: 'FVG',
         poi: fvg,
@@ -665,6 +665,7 @@ export function runPipeline(
         sweeps: modelState.triggeringSweep ? [modelState.triggeringSweep] : [],
       });
       const setupAssessmentComparison = compareV1GradeWithV2Assessment(gradeResult, setupAssessmentV2);
+      observePoiLifecycle('FVG', fvg, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult, setupAssessmentV2);
 
       candidates.push({
         symbol,
