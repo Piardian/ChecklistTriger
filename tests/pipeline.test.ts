@@ -103,30 +103,28 @@ describe('Pipeline Orchestrator', () => {
     candles[20].open = 180;
     candles[20].close = 220; // breakout of High 2 (200)
     candles[20].high = 220;
-    candles[20].low = 180;
+    candles[20].low = 195;
 
-    // Populate candleStore
-    candles.forEach(c => {
-      candleStore.appendCandle('EURUSD', '4h', c);
-      candleStore.appendCandle('EURUSD', '1h', c);
-      candleStore.appendCandle('EURUSD', '15m', c);
-    });
+    // Populate candleStore with separate 4H/1H context and 15M execution structure.
+    appendPipelineCandles(candleStore, 'EURUSD', candles);
 
-    // First run should trigger notifications
-    const res1 = runPipeline('EURUSD', candleStore, notifiedStore);
+    // Use a deterministic observation time so the 48-hour POI TTL is evaluated against the fixture, not wall-clock time.
+    const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
+    // First run should trigger notifications.
+    const res1 = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
     expect(res1.length).toBeGreaterThan(0);
     expect(res1[0].gradeResult.entryAllowed).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(res1[0], 'signalQualityResult')).toBe(false);
 
     // Detection remains side-effect free until the delivery layer owns the candidate.
-    const res2 = runPipeline('EURUSD', candleStore, notifiedStore);
+    const res2 = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
     expect(res2.map(candidate => candidate.uniqueKey)).toEqual(res1.map(candidate => candidate.uniqueKey));
 
     for (const candidate of res1) {
       notifiedStore.markAsNotified(candidate.uniqueKey);
       if (candidate.dedupeKey) notifiedStore.markAsNotified(candidate.dedupeKey);
     }
-    expect(runPipeline('EURUSD', candleStore, notifiedStore)).toEqual([]);
+    expect(runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp)).toEqual([]);
   });
 
   test('should attach SignalQualityResult only when observer feature flag is enabled', () => {
@@ -175,17 +173,14 @@ describe('Pipeline Orchestrator', () => {
     candles[19].high = 180;
     candles[19].low = 150;
     candles[20].open = 180;
-    candles[20].close = 220;
-    candles[20].high = 220;
-    candles[20].low = 180;
+    candles[20].close = 110;
+    candles[20].high = 110;
+    candles[20].low = 97;
 
-    candles.forEach(c => {
-      candleStore.appendCandle('EURUSD', '4h', c);
-      candleStore.appendCandle('EURUSD', '1h', c);
-      candleStore.appendCandle('EURUSD', '15m', c);
-    });
+    appendPipelineCandles(candleStore, 'EURUSD', candles);
 
-    const res = runPipeline('EURUSD', candleStore, notifiedStore);
+    const analysisTimestamp = Date.UTC(2024, 5, 3, 12, 0, 0);
+    const res = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
 
     expect(res.length).toBeGreaterThan(0);
     expect(res[0].signalQualityResult?.version).toBe(1);
@@ -246,13 +241,9 @@ describe('Pipeline Orchestrator', () => {
 
     candles[18].open = 120; candles[18].close = 150; candles[18].high = 150; candles[18].low = 120;
     candles[19].open = 150; candles[19].close = 180; candles[19].high = 180; candles[19].low = 150;
-    candles[20].open = 180; candles[20].close = 220; candles[20].high = 220; candles[20].low = 180;
+    candles[20].open = 180; candles[20].close = 110; candles[20].high = 110; candles[20].low = 97;
 
-    candles.forEach(c => {
-      candleStore.appendCandle('GBPUSD', '4h', c);
-      candleStore.appendCandle('GBPUSD', '1h', c);
-      candleStore.appendCandle('GBPUSD', '15m', c);
-    });
+    appendPipelineCandles(candleStore, 'GBPUSD', candles);
 
     const mockDq = jest.spyOn(scorerModule, 'scoreDisplacementQuality').mockReturnValue({
       legDirection: 'bullish',
@@ -265,9 +256,113 @@ describe('Pipeline Orchestrator', () => {
       gradePoints: 2,
     });
 
-    const res = runPipeline('GBPUSD', candleStore, notifiedStore);
+    const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
+    const res = runPipeline('GBPUSD', candleStore, notifiedStore, analysisTimestamp);
     expect(res.length).toBeGreaterThan(0);
 
     mockDq.mockRestore();
   });
 });
+
+function appendPipelineCandles(
+  candleStore: CandleStore,
+  symbol: 'EURUSD' | 'GBPUSD',
+  candles15m: Candle[]
+): void {
+  // Clean 15M fixture: two rising swing highs/lows followed by a bullish BOS.
+  for (let i = 0; i < 25; i += 1) {
+    candles15m[i] = {
+      timestamp: candles15m[i].timestamp,
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+    };
+  }
+
+  candles15m[2].low = 60;
+  candles15m[3].low = 55;
+  candles15m[4].low = 50;
+  candles15m[5].low = 70;
+  candles15m[6].low = 75;
+
+  candles15m[6].high = 80;
+  candles15m[6].low = 70;
+  candles15m[7].high = 85;
+  candles15m[7].low = 72;
+  candles15m[8].high = 90;
+  candles15m[8].low = 75;
+  candles15m[9].high = 88;
+  candles15m[9].low = 73;
+  candles15m[10].high = 86;
+  candles15m[10].low = 82;
+  candles15m[11].high = 101;
+  candles15m[11].low = 85;
+  candles15m[12].high = 101;
+  candles15m[12].low = 80;
+  candles15m[13].high = 101;
+  candles15m[13].low = 88;
+  candles15m[14].high = 92;
+  candles15m[14].low = 87;
+
+  candles15m[15].high = 95;
+  candles15m[15].low = 90;
+  candles15m[16].high = 100;
+  candles15m[16].low = 90;
+  candles15m[17].high = 99;
+  candles15m[17].low = 90;
+
+  // Bearish OB candle immediately before the bullish displacement leg.
+  candles15m[17] = {
+    timestamp: candles15m[17].timestamp,
+    open: 100,
+    high: 99,
+    low: 90,
+    close: 95,
+  };
+
+  candles15m[18] = {
+    timestamp: candles15m[18].timestamp,
+    open: 80,
+    high: 98.5,
+    low: 78.5,
+    close: 98,
+  };
+  candles15m[19] = {
+    timestamp: candles15m[19].timestamp,
+    open: 80,
+    high: 99.5,
+    low: 79.5,
+    close: 99,
+  };
+  candles15m[20] = {
+    timestamp: candles15m[20].timestamp,
+    open: 99,
+    high: 110,
+    low: 99,
+    close: 110,
+  };
+  // Keep the post-break observation window neutral and below the midpoint so
+  // the latest closed price remains in 4H/1H Discount without creating a new swing.
+  for (let i = 21; i < 25; i += 1) {
+    candles15m[i] = {
+      timestamp: candles15m[i].timestamp,
+      open: 89,
+      high: 91,
+      low: 89,
+      close: 90,
+    };
+  }
+
+  // 4H/1H context: bullish structure with current price in Discount.
+  const contextCandles = candles15m.map(candle => ({ ...candle }));
+  contextCandles[8].high = 150;
+  contextCandles[16].high = 200;
+  contextCandles[20].close = 110;
+
+  contextCandles.forEach(candle => {
+    candleStore.appendCandle(symbol, '4h', candle);
+    candleStore.appendCandle(symbol, '1h', candle);
+  });
+  candles15m.forEach(candle => candleStore.appendCandle(symbol, '15m', candle));
+}

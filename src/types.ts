@@ -77,4 +77,11 @@ export interface DisplacementQuality {
   totalScore: number;
   quality: 'güçlü' | 'orta' | 'zayıf' | 'yok';
   gradePoints: 2 | 1 | 0 | -2;
+  readonly avgBodyRatio?: number;
+  readonly consecutiveCount?: number;
+  readonly fvgCount?: number;
+  readonly rawImbalanceDetected?: boolean;
+  readonly legAvgRange?: number;
+  readonly priorAvgRange?: number;
+  readonly sizeRatio?: number | null;
 }

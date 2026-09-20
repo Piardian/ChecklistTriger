@@ -1,5 +1,7 @@
 import { Candle, SwingPoint, PremiumDiscountState } from './types';
 
+export const PREMIUM_DISCOUNT_THRESHOLD = 0.5 as const;
+
 /**
  * Calculates Premium/Discount (Fib) status from the latest confirmed dealing range.
  *
@@ -7,6 +9,9 @@ import { Candle, SwingPoint, PremiumDiscountState } from './types';
  * rather than independently selecting the latest high and latest low from
  * different structural legs. This avoids accidentally combining unrelated
  * swing points into one dealing range.
+ *
+ * Premium/discount split: > 0.50 is premium, < 0.50 is discount, exactly
+ * 0.50 is equilibrium. Keep this threshold versioned with the analysis rulebook.
  */
 export function calculatePremiumDiscount(
   candles: Candle[],
@@ -76,9 +81,9 @@ export function calculatePremiumDiscount(
   const fibValue = (currentPrice - rangeLow) / (rangeHigh - rangeLow);
 
   let status: 'premium' | 'discount' | 'eq';
-  if (fibValue > 0.55) {
+  if (fibValue > PREMIUM_DISCOUNT_THRESHOLD) {
     status = 'premium';
-  } else if (fibValue < 0.45) {
+  } else if (fibValue < PREMIUM_DISCOUNT_THRESHOLD) {
     status = 'discount';
   } else {
     status = 'eq';

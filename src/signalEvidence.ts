@@ -88,6 +88,8 @@ export interface SignalMarketContextEvidence {
   readonly dayOfWeek: number;
   readonly dayOfWeekName: string;
   readonly hourUtc: number;
+  readonly hourLocal?: number;
+  readonly timezone?: string;
   readonly volatilityAtr: number | null;
   readonly marketWindowState: {
     readonly active: boolean;
@@ -104,6 +106,7 @@ export interface SignalClassificationEvidence {
   readonly grade: GradeResult['grade'];
   readonly score: number;
   readonly entryAllowed: boolean;
+  readonly rulebookVersion?: string;
 }
 
 export interface SignalEvidenceRecord {
@@ -164,6 +167,7 @@ export interface SignalEvidenceRecord {
   };
   readonly model: {
     readonly modelState: 'confirmed' | 'weak' | 'missing';
+    readonly modelType?: 'model1_reversal' | 'model2_continuation' | 'none';
     readonly admissionProfile: string;
   };
   readonly grade: {
@@ -244,6 +248,7 @@ export interface CompletedSignalOutcomeEvaluationEvidence {
   readonly entryWindowBars: number;
   readonly maxHoldBars: number;
   readonly sameCandleResolution: 'STOP_LOSS_FIRST';
+  readonly sameCandleConflict?: boolean;
   readonly entryTriggeredAt: number | null;
   readonly evaluatedCandles: number;
   readonly evaluationStartTimestamp: number;

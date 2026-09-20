@@ -62,8 +62,14 @@ export function detectFVGsInLeg(
   const minPips = (MIN_FVG_PIPS[pair] ?? MIN_FVG_PIPS['EURUSD'])[timeframe];
   const pipMultiplier = getPipMultiplier(pair);
 
-  // Iterate the middle candle index 'i' through the leg
-  for (let i = leg.startIndex; i <= leg.endIndex; i++) {
+  // A three-candle FVG centered at i needs i+1. The candle after the
+  // structure break is not available at the break event and must never
+  // influence a pre-entry setup.
+  const safeEndIndex = Math.min(leg.endIndex - 1, candles.length - 2);
+
+  // Iterate only over middle candles whose full 3-candle window is
+  // available no later than the structure event itself.
+  for (let i = leg.startIndex; i <= safeEndIndex; i++) {
     if (i - 1 < 0 || i + 1 >= candles.length) {
       continue;
     }

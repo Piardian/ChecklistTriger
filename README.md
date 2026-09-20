@@ -238,3 +238,35 @@ ChecklistTrigger is an engineering framework designed for deterministic market s
 ## 📄 License
 
 Distributed under the **MIT License**. See [`LICENSE`](./LICENSE) for more information.
+
+
+## Historical Research Data
+
+Historical replay uses canonical OHLC JSON files in `data/`:
+
+```text
+data/EURUSD_15m.json
+data/EURUSD_1h.json
+data/EURUSD_4h.json
+```
+
+Download a bounded historical window from the existing Twelve Data provider:
+
+```bash
+npm run data:download -- --symbol EURUSD --months 6
+```
+
+Or specify an explicit UTC range:
+
+```bash
+npm run data:download -- --symbol EURUSD --start 2026-03-01T00:00:00Z --end 2026-09-01T00:00:00Z
+```
+
+Validate the generated datasets before replay:
+
+```bash
+REPLAY_SYMBOLS=EURUSD npm run data:validate
+```
+
+The downloader requests bounded `start_date`/`end_date` windows and keeps each request below Twelve Data's documented 5,000-point maximum. The generated data is local research input and remains ignored by Git.
+

@@ -44,7 +44,13 @@ describe('Signal Evidence Recorder', () => {
       eventTimestamp: 2000,
       eventTimeframe: '15m',
       structureScore: 2,
-      swingContext: null,
+      swingContext: {
+        brokenSwingPrice: 1.103,
+        brokenSwingType: 'high',
+        formedAtIndex: 0,
+        confirmedAtIndex: 1,
+        timestamp: 1000,
+      },
     });
     expect(evidence.classification?.strategy).toBe('SWING_BOS_CORE');
     expect(evidence.marketContext?.session).toBeDefined();
@@ -176,6 +182,25 @@ function candidate(): NotificationCandidate {
     pd1H: 'discount',
     pd15M: 'discount',
     admissionProfile: 'PRODUCTION',
+    modelState: {
+      model: 'model2_continuation',
+      regime: 'bullish',
+      triggeringSweep: null,
+      triggeringBOS: {
+        type: 'BOS',
+        direction: 'bullish',
+        brokenSwing: {
+          type: 'high',
+          price: 1.103,
+          formedAtIndex: 0,
+          confirmedAtIndex: 1,
+          timestamp: 1000,
+        },
+        breakCandleIndex: 1,
+        breakTimestamp: 2000,
+        breakClosePrice: 1.106,
+      },
+    },
   };
 }
 

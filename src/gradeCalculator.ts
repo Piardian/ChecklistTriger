@@ -3,6 +3,7 @@ import { ModelState } from './modelDeterminer';
 import { POITestResult } from './poiTestCounter';
 import { LiquidityMagnet } from './liquidityMagnetDetector';
 import { OpposingObstacle } from './opposingObstacleDetector';
+import { GRADE_RULEBOOK_VERSION, GRADE_RULES, getGradeRulebookSnapshot } from './gradeRulebook';
 
 export interface GradeInput {
   tradeDirection: 'long' | 'short';
@@ -40,6 +41,8 @@ export interface GradeResult {
   }>;
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
+  readonly rulebookVersion?: typeof GRADE_RULEBOOK_VERSION;
+  readonly rulebook?: ReturnType<typeof getGradeRulebookSnapshot>;
 }
 
 /**
@@ -148,11 +151,11 @@ export function scorePOIQuality(
   pd1H: PremiumDiscountState,
   tradeDirection: 'long' | 'short'
 ): number {
-  if (poiTestCount >= 3) {
+  if (poiTestCount >= GRADE_RULES.poi.vetoAt) {
     return -2;
   }
 
-  if (poiTestCount === 2) {
+  if (poiTestCount === GRADE_RULES.poi.overtestedAt) {
     return -1;
   }
 
@@ -190,23 +193,23 @@ export function calculateGrade(input: GradeInput): GradeResult {
       (input.tradeDirection === 'long' && input.pd15M.status === 'premium') ||
       (input.tradeDirection === 'short' && input.pd15M.status === 'discount');
     if (is15MOpposite) {
-      totalScore -= 1;
+      totalScore -= GRADE_RULES.scoring.fifteenMinuteOppositePdPenalty;
     }
   }
 
   // Liquidity Magnet Bonus (+1) if active
   if (input.liquidityMagnet && input.liquidityMagnet.isActive && totalScore < 9) {
-    totalScore += 1;
+    totalScore += GRADE_RULES.scoring.liquidityMagnetBonus;
   }
 
   let grade: 'A+' | 'A' | 'B+' | 'B' | 'C';
-  if (totalScore >= 8) {
+  if (totalScore >= GRADE_RULES.thresholds.aPlus) {
     grade = 'A+';
-  } else if (totalScore >= 6) {
+  } else if (totalScore >= GRADE_RULES.thresholds.a) {
     grade = 'A';
-  } else if (totalScore >= 4) {
+  } else if (totalScore >= GRADE_RULES.thresholds.bPlus) {
     grade = 'B+';
-  } else if (totalScore >= 2) {
+  } else if (totalScore >= GRADE_RULES.thresholds.b) {
     grade = 'B';
   } else {
     grade = 'C';
@@ -236,10 +239,10 @@ export function calculateGrade(input: GradeInput): GradeResult {
         is4HPDDirectlyOpposite ||
         is1HPDDirectlyOpposite ||
         is15MPDOpposite ||
-        input.displacementQuality15m?.quality !== 'güçlü' ||
-        input.poiTestCount > 0 ||
+        GRADE_RULES.aPlus.requireStrongDisplacement && input.displacementQuality15m?.quality !== 'güçlü' ||
+        input.poiTestCount > GRADE_RULES.aPlus.maxTests ||
         input.bias1H !== expected4HBias ||
-        !isSweepConfirmed) {
+        GRADE_RULES.aPlus.requireSweepConfirmation && !isSweepConfirmed) {
       grade = 'A';
     }
   }
@@ -250,7 +253,7 @@ export function calculateGrade(input: GradeInput): GradeResult {
     if (grade === 'A+' || grade === 'A') grade = 'B+';
   }
   // - Over-tested POI (>= 2 tests): Cap at B+ (no entry)
-  if (input.poiTestCount >= 2) {
+  if (input.poiTestCount >= GRADE_RULES.poi.overtestedAt) {
     if (grade === 'A+' || grade === 'A') grade = 'B+';
   }
   // - 1H opposite in Model 2 continuation: Cap at B+
@@ -269,12 +272,12 @@ export function calculateGrade(input: GradeInput): GradeResult {
   }
 
   // - Opposing Obstacle Check: If immediate obstacle (<= 15 pips), cap at B+
-  if (input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= 15) {
+  if (input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= GRADE_RULES.caps.immediateObstacleDistancePips) {
     if (grade === 'A+' || grade === 'A') grade = 'B+';
   }
 
   const blockReasons: string[] = [];
-  if (input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= 15) {
+  if (input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= GRADE_RULES.caps.immediateObstacleDistancePips) {
     blockReasons.push(input.opposingObstacle.warningText);
   }
   if (input.bias4H !== expected4HBias) {
@@ -298,7 +301,7 @@ export function calculateGrade(input: GradeInput): GradeResult {
   if (input.displacementQuality15m === null || input.displacementQuality15m.gradePoints < 1) {
     blockReasons.push('15M displacement quality is insufficient');
   }
-  if (input.poiTestCount >= 2) {
+  if (input.poiTestCount >= GRADE_RULES.poi.overtestedAt) {
     blockReasons.push('POI is already tested multiple times; fresh POIs required for entry');
   }
   if (input.modelState.model === 'none') {
@@ -315,10 +318,10 @@ export function calculateGrade(input: GradeInput): GradeResult {
     !(is1HPDDirectlyOpposite && is15MPDOpposite) &&
     input.bias4H === expected4HBias &&
     input.modelState.model !== 'none' &&
-    (input.displacementQuality15m !== null && input.displacementQuality15m.gradePoints >= 1) &&
-    input.poiTestCount <= 1 &&
+    (input.displacementQuality15m !== null && input.displacementQuality15m.gradePoints >= GRADE_RULES.minEntry.displacementGradePoints) &&
+    input.poiTestCount <= GRADE_RULES.minEntry.maxPoiTests &&
     input.has15mEvent &&
-    !(input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= 15);
+    !(input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= GRADE_RULES.caps.immediateObstacleDistancePips);
 
   const entryAllowed = blockReasons.length === 0 && (grade === 'A+' || grade === 'A') && meetsCategoryMinimums;
 
@@ -340,5 +343,7 @@ export function calculateGrade(input: GradeInput): GradeResult {
     },
     liquidityMagnet: input.liquidityMagnet ?? null,
     opposingObstacle: input.opposingObstacle ?? null,
+    rulebookVersion: GRADE_RULEBOOK_VERSION,
+    rulebook: getGradeRulebookSnapshot(),
   };
 }
