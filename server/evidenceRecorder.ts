@@ -272,7 +272,8 @@ export function buildSignalEvidenceRecord(
       sweepQuality: candidate.setupAssessmentV2?.detector.sweep.timestamp ? 'strong' : 'missing',
     },
     model: {
-      modelState: candidate.modelState?.model ?? 'none',
+      modelState: candidate.modelState?.model && candidate.modelState.model !== 'none' ? 'confirmed' : 'missing',
+      modelType: candidate.modelState?.model ?? 'none',
       admissionProfile: candidate.admissionProfile ?? 'PRODUCTION',
     },
     grade: {
