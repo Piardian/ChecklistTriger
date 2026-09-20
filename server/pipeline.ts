@@ -720,6 +720,7 @@ export function runPipeline(
         setupAssessmentV2,
         setupAssessmentComparison,
         admissionProfile: admissionProfile(),
+        admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
         });
