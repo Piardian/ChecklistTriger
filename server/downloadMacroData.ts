@@ -2,7 +2,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { MACRO_SOURCE, MacroSeriesObservation } from './macroContext';
 
-const SERIES = ['DFF', 'DGS10', 'DTWEXBGS', 'CPIAUCSL', 'UNRATE', 'PAYEMS'] as const;
+const SERIES = [
+  'DFF',
+  'DGS10',
+  'DFII10',
+  'DTWEXBGS',
+  'CPIAUCSL',
+  'UNRATE',
+  'PAYEMS',
+  'ECBDFR',
+  'CP0000EZ19M086NEST',
+  'VIXCLS',
+] as const;
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
