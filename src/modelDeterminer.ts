@@ -60,11 +60,17 @@ export function determineModel(
 
   // Model 1: Range + Sweep
   if (currentTrendAtIdx === 'range') {
+    const expectedSweepType =
+      focusEvent?.direction === 'bullish' ? 'sweep_low' :
+      focusEvent?.direction === 'bearish' ? 'sweep_high' :
+      null;
+
     const validSweeps = sweepEvents.filter(
-      s =>
-        s.candleIndex >= regimeStartIndex &&
-        s.candleIndex <= currentIndex &&
-        (!focusEvent || s.candleIndex <= focusEvent.breakCandleIndex)
+      sweep =>
+        sweep.candleIndex >= regimeStartIndex &&
+        sweep.candleIndex <= currentIndex &&
+        (!focusEvent || sweep.candleIndex <= focusEvent.breakCandleIndex) &&
+        (expectedSweepType === null || sweep.type === expectedSweepType)
     );
 
     if (validSweeps.length > 0) {
