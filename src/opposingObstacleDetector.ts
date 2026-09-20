@@ -7,9 +7,9 @@ export interface OpposingObstacle {
   timeframe: '15m' | '1h';
   level: { low: number; high: number } | null;
   distancePips: number;
-  lifecycle: 'ACTIVE' | 'MITIGATED' | 'INVALIDATED' | 'NONE';
-  firstMitigationAt: number | null;
-  invalidatedAt: number | null;
+  lifecycle?: 'ACTIVE' | 'MITIGATED' | 'INVALIDATED' | 'NONE';
+  firstMitigationAt?: number | null;
+  invalidatedAt?: number | null;
   warningText: string;
 }
 
