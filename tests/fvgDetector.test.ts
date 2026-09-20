@@ -67,7 +67,7 @@ describe('FVG Detector', () => {
     const candles: Candle[] = [
       { timestamp: 0, open: 1.0500, high: 1.0502, low: 1.0498, close: 1.0500 },
       { timestamp: 1000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 },
-      { timestamp: 2000, open: 1.0520, high: 1.0530, low: 1.0520, close: 1.0525 }, // structure break
+      { timestamp: 2000, open: 1.0520, high: 1.0530, low: 1.0500, close: 1.0525 }, // structure break
       { timestamp: 3000, open: 1.0530, high: 1.0600, low: 1.0590, close: 1.0595 }, // future candle
     ];
 
