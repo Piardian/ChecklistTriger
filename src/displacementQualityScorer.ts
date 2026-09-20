@@ -117,7 +117,8 @@ export function scoreDisplacementQuality(
   let sizeScore = 0;
   if (priorAvgRange > 0) {
     const ratio = legAvgRange / priorAvgRange;
-    if (ratio >= 1.5) {
+    const thresholdEpsilon = 1e-9;
+    if (ratio + thresholdEpsilon >= 1.5) {
       sizeScore = 1;
     } else if (ratio >= 1.0) {
       sizeScore = 0.5;
