@@ -72,111 +72,143 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
     warningText: '',
   };
 
-  const isActive = (lifecycle: Lifecycle): boolean => lifecycle.lifecycle === 'ACTIVE';
-
   if (input.tradeDirection === 'long') {
-    const entryTop = input.entryZone.high;
-    const maxObstaclePrice = entryTop + clearanceUnits;
-
-    for (const ob of input.activeOrderBlocks15m) {
-      if (ob.direction !== 'bearish' || ob.low <= entryTop || ob.low > maxObstaclePrice) continue;
-      const lifecycle = getLifecycle(
-        ob.formedAtIndex,
-        ob.low,
-        ob.high,
-        input.candles15m,
-        input.currentIndex15m,
-        'bearish'
-      );
-      if (!isActive(lifecycle)) continue;
-      const dist = roundPips((ob.low - entryTop) / pip);
-      return {
-        hasObstacle: true,
-        obstacleType: 'OB',
-        timeframe: '15m',
-        level: { low: ob.low, high: ob.high },
-        distancePips: dist,
-        ...lifecycle,
-        warningText: 'Karsi Engel: ' + dist + ' pip yukarida 15M Bearish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')',
-      };
-    }
-
-    for (const fvg of input.activeFVGs15m) {
-      if (fvg.direction !== 'bearish' || fvg.gapLow <= entryTop || fvg.gapLow > maxObstaclePrice) continue;
-      const lifecycle = getLifecycle(
-        fvg.middleCandleIndex,
-        fvg.gapLow,
-        fvg.gapHigh,
-        input.candles15m,
-        input.currentIndex15m,
-        'bearish'
-      );
-      if (!isActive(lifecycle)) continue;
-      const dist = roundPips((fvg.gapLow - entryTop) / pip);
-      return {
-        hasObstacle: true,
-        obstacleType: 'FVG',
-        timeframe: '15m',
-        level: { low: fvg.gapLow, high: fvg.gapHigh },
-        distancePips: dist,
-        ...lifecycle,
-        warningText: 'Karsi Engel: ' + dist + ' pip yukarida 15M Bearish FVG mevcut (' + fvg.gapLow.toFixed(4) + ' - ' + fvg.gapHigh.toFixed(4) + ')',
-      };
-    }
-
-    return find1hLongObstacle(input, entryTop, maxObstaclePrice, pip) ?? noObstacle;
+    const entryBoundary = input.entryZone.high;
+    const maxPrice = entryBoundary + clearanceUnits;
+    const obstacle15m = selectNearestActiveObstacle(
+      collect15mLongCandidates(input, entryBoundary, maxPrice, pip),
+      input
+    );
+    if (obstacle15m) return obstacle15m;
+    return find1hLongObstacle(input, entryBoundary, maxPrice, pip) ?? noObstacle;
   }
 
-  const entryBottom = input.entryZone.low;
-  const minObstaclePrice = entryBottom - clearanceUnits;
+  const entryBoundary = input.entryZone.low;
+  const minPrice = entryBoundary - clearanceUnits;
+  const obstacle15m = selectNearestActiveObstacle(
+    collect15mShortCandidates(input, entryBoundary, minPrice, pip),
+    input
+  );
+  if (obstacle15m) return obstacle15m;
+  return find1hShortObstacle(input, entryBoundary, minPrice, pip) ?? noObstacle;
+}
 
+interface ObstacleCandidate {
+  obstacleType: 'OB' | 'FVG';
+  timeframe: '15m' | '1h';
+  level: { low: number; high: number };
+  distancePips: number;
+  formedAtIndex: number;
+  direction: 'bullish' | 'bearish';
+  lifecycle: Lifecycle;
+}
+
+function collect15mLongCandidates(
+  input: ObstacleCheckInput,
+  entryTop: number,
+  maxObstaclePrice: number,
+  pip: number
+): ObstacleCandidate[] {
+  const candidates: ObstacleCandidate[] = [];
   for (const ob of input.activeOrderBlocks15m) {
-    if (ob.direction !== 'bullish' || ob.high >= entryBottom || ob.high < minObstaclePrice) continue;
-    const lifecycle = getLifecycle(
-      ob.formedAtIndex,
-      ob.low,
-      ob.high,
-      input.candles15m,
-      input.currentIndex15m,
-      'bullish'
-    );
-    if (!isActive(lifecycle)) continue;
-    const dist = roundPips((entryBottom - ob.high) / pip);
-    return {
-      hasObstacle: true,
+    if (ob.direction !== 'bearish' || ob.low <= entryTop || ob.low > maxObstaclePrice) continue;
+    const lifecycle = getLifecycle(ob.formedAtIndex, ob.low, ob.high, input.candles15m, input.currentIndex15m, 'bearish');
+    if (lifecycle.lifecycle !== 'ACTIVE') continue;
+    candidates.push({
       obstacleType: 'OB',
       timeframe: '15m',
       level: { low: ob.low, high: ob.high },
-      distancePips: dist,
-      ...lifecycle,
-      warningText: 'Karsi Engel: ' + dist + ' pip asagida 15M Bullish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')',
-    };
+      distancePips: roundPips((ob.low - entryTop) / pip),
+      formedAtIndex: ob.formedAtIndex,
+      direction: 'bearish',
+      lifecycle,
+    });
   }
-
   for (const fvg of input.activeFVGs15m) {
-    if (fvg.direction !== 'bullish' || fvg.gapHigh >= entryBottom || fvg.gapHigh < minObstaclePrice) continue;
-    const lifecycle = getLifecycle(
-      fvg.middleCandleIndex,
-      fvg.gapLow,
-      fvg.gapHigh,
-      input.candles15m,
-      input.currentIndex15m,
-      'bullish'
-    );
-    if (!isActive(lifecycle)) continue;
-    const dist = roundPips((entryBottom - fvg.gapHigh) / pip);
-    return {
-      hasObstacle: true,
+    if (fvg.direction !== 'bearish' || fvg.gapLow <= entryTop || fvg.gapLow > maxObstaclePrice) continue;
+    const lifecycle = getLifecycle(fvg.middleCandleIndex, fvg.gapLow, fvg.gapHigh, input.candles15m, input.currentIndex15m, 'bearish');
+    if (lifecycle.lifecycle !== 'ACTIVE') continue;
+    candidates.push({
       obstacleType: 'FVG',
       timeframe: '15m',
       level: { low: fvg.gapLow, high: fvg.gapHigh },
-      distancePips: dist,
-      ...lifecycle,
-      warningText: 'Karsi Engel: ' + dist + ' pip asagida 15M Bullish FVG mevcut (' + fvg.gapLow.toFixed(4) + ' - ' + fvg.gapHigh.toFixed(4) + ')',
-    };
+      distancePips: roundPips((fvg.gapLow - entryTop) / pip),
+      formedAtIndex: fvg.middleCandleIndex,
+      direction: 'bearish',
+      lifecycle,
+    });
   }
+  return candidates;
+}
 
-  return find1hShortObstacle(input, entryBottom, minObstaclePrice, pip) ?? noObstacle;
+function collect15mShortCandidates(
+  input: ObstacleCheckInput,
+  entryBottom: number,
+  minObstaclePrice: number,
+  pip: number
+): ObstacleCandidate[] {
+  const candidates: ObstacleCandidate[] = [];
+  for (const ob of input.activeOrderBlocks15m) {
+    if (ob.direction !== 'bullish' || ob.high >= entryBottom || ob.high < minObstaclePrice) continue;
+    const lifecycle = getLifecycle(ob.formedAtIndex, ob.low, ob.high, input.candles15m, input.currentIndex15m, 'bullish');
+    if (lifecycle.lifecycle !== 'ACTIVE') continue;
+    candidates.push({
+      obstacleType: 'OB',
+      timeframe: '15m',
+      level: { low: ob.low, high: ob.high },
+      distancePips: roundPips((entryBottom - ob.high) / pip),
+      formedAtIndex: ob.formedAtIndex,
+      direction: 'bullish',
+      lifecycle,
+    });
+  }
+  for (const fvg of input.activeFVGs15m) {
+    if (fvg.direction !== 'bullish' || fvg.gapHigh >= entryBottom || fvg.gapHigh < minObstaclePrice) continue;
+    const lifecycle = getLifecycle(fvg.middleCandleIndex, fvg.gapLow, fvg.gapHigh, input.candles15m, input.currentIndex15m, 'bullish');
+    if (lifecycle.lifecycle !== 'ACTIVE') continue;
+    candidates.push({
+      obstacleType: 'FVG',
+      timeframe: '15m',
+      level: { low: fvg.gapLow, high: fvg.gapHigh },
+      distancePips: roundPips((entryBottom - fvg.gapHigh) / pip),
+      formedAtIndex: fvg.middleCandleIndex,
+      direction: 'bullish',
+      lifecycle,
+    });
+  }
+  return candidates;
+}
+
+function selectNearestActiveObstacle(
+  candidates: readonly ObstacleCandidate[],
+  input: ObstacleCheckInput
+): OpposingObstacle | null {
+  if (candidates.length === 0) return null;
+  const rankType = (type: ObstacleCandidate['obstacleType']): number => type === 'OB' ? 0 : 1;
+  const selected = [...candidates].sort((a, b) =>
+    a.distancePips - b.distancePips ||
+    rankType(a.obstacleType) - rankType(b.obstacleType) ||
+    a.formedAtIndex - b.formedAtIndex ||
+    a.level.low - b.level.low ||
+    a.level.high - b.level.high
+  )[0];
+
+  const timeframeText = selected.timeframe === '15m' ? '15M' : '1H';
+  const directionText = selected.direction === 'bearish' ? 'Bearish' : 'Bullish';
+  const sideText = input.tradeDirection === 'long' ? 'yukarida' : 'asagida';
+  const priceText = selected.level.low.toFixed(4) + ' - ' + selected.level.high.toFixed(4);
+
+  return {
+    hasObstacle: true,
+    obstacleType: selected.obstacleType,
+    timeframe: selected.timeframe,
+    level: selected.level,
+    distancePips: selected.distancePips,
+    ...selected.lifecycle,
+    warningText: 'Karsi Engel: ' + selected.distancePips + ' pip ' + sideText + ' ' +
+      timeframeText + ' ' + directionText + ' ' + selected.obstacleType +
+      ' mevcut (' + priceText + ')',
+  };
 }
 
 function find1hLongObstacle(
