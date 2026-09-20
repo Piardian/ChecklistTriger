@@ -1,4 +1,5 @@
 import { NotificationCandidate } from '../server/pipeline';
+import * as pipelineModule from '../server/pipeline';
 import { createSignalContext } from '../src/signalContext';
 import { runHistoricalMarketReplay } from '../src/historicalMarketReplay';
 import { OrderBlock, StructureEvent } from '../src/types';
@@ -24,6 +25,21 @@ function createDataset() {
 }
 
 describe('Historical Market Replay', () => {
+  it('passes the replay cursor into the default pipeline candidate generator', () => {
+    const dataset = createDataset();
+    const runPipelineSpy = jest.spyOn(pipelineModule, 'runPipeline').mockReturnValue([]);
+
+    runHistoricalMarketReplay(dataset, {
+      startedTimestamp: 1000,
+      finishedTimestamp: 4000,
+      respectMarketWindow: false,
+      respectKillzone: false,
+    });
+
+    expect(runPipelineSpy.mock.calls.map(call => call[3])).toEqual([1000, 2000, 3000, 4000]);
+    runPipelineSpy.mockRestore();
+  });
+
   it('never exposes candles after the current replay timestamp to candidate generation', () => {
     const dataset = createDataset();
     const observed = [] as Array<{
