@@ -10,7 +10,7 @@ import { findDisplacementLeg } from '../src/displacementLeg';
 import { scoreDisplacementQuality } from '../src/displacementQualityScorer';
 import { calculateRange } from '../src/rangeCalculator';
 import { detectSweeps } from '../src/sweepDetector';
-import { determineModel } from '../src/modelDeterminer';
+import { determineModel, ModelState } from '../src/modelDeterminer';
 import { countOBTests, countFVGTests } from '../src/poiTestCounter';
 import { calculateGrade, GradeInput, GradeResult } from '../src/gradeCalculator';
 import { evaluateSignalQuality, SignalQualityResult } from '../src/signalQualityEngine';
@@ -59,6 +59,7 @@ export interface NotificationCandidate {
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
   macroContext?: import('./macroContext').MacroContext;
+  modelState?: ModelState | null;
 }
 
 export function runPipeline(
@@ -522,6 +523,7 @@ export function runPipeline(
         liquidityMagnet,
         opposingObstacle,
         macroContext: researchMacroContext,
+        modelState,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
