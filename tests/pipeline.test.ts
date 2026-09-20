@@ -265,34 +265,61 @@ function appendPipelineCandles(
   symbol: 'EURUSD' | 'GBPUSD',
   candles15m: Candle[]
 ): void {
-  // The 15M fixture creates the local bullish BOS/OB.
+  // Clean 15M fixture: two rising swing highs/lows followed by a bullish BOS.
+  for (let i = 0; i < 25; i += 1) {
+    candles15m[i] = {
+      timestamp: candles15m[i].timestamp,
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+    };
+  }
+
+  candles15m[2].low = 60;
+  candles15m[3].low = 55;
   candles15m[4].low = 50;
+  candles15m[5].low = 70;
+  candles15m[6].low = 75;
+
+  candles15m[6].high = 80;
+  candles15m[7].high = 85;
   candles15m[8].high = 90;
+  candles15m[9].high = 88;
+  candles15m[10].high = 86;
+
+  candles15m[10].low = 82;
+  candles15m[11].low = 85;
   candles15m[12].low = 80;
+  candles15m[13].low = 88;
+  candles15m[14].low = 87;
+
+  candles15m[14].high = 92;
+  candles15m[15].high = 95;
   candles15m[16].high = 100;
-  candles15m[14].high = 95;
-  candles15m[14].low = 90;
-  candles15m[15].high = 97;
-  candles15m[15].low = 92;
+  candles15m[17].high = 99;
+
+  // Bearish OB candle immediately before the bullish displacement leg.
   candles15m[17] = {
     timestamp: candles15m[17].timestamp,
-    open: 99,
-    high: 99.5,
+    open: 100,
+    high: 99,
     low: 90,
     close: 95,
   };
+
   candles15m[18] = {
     timestamp: candles15m[18].timestamp,
-    open: 95,
+    open: 94,
     high: 98,
-    low: 94.5,
-    close: 97,
+    low: 94,
+    close: 96,
   };
   candles15m[19] = {
     timestamp: candles15m[19].timestamp,
-    open: 97,
+    open: 96,
     high: 99,
-    low: 96.5,
+    low: 96,
     close: 98,
   };
   candles15m[20] = {
@@ -303,13 +330,10 @@ function appendPipelineCandles(
     close: 110,
   };
 
-  // 4H/1H context stays bullish, but current price remains in 4H Discount.
+  // 4H/1H context: bullish structure with current price in Discount.
   const contextCandles = candles15m.map(candle => ({ ...candle }));
-  contextCandles[4].low = 50;
   contextCandles[8].high = 150;
-  contextCandles[12].low = 80;
   contextCandles[16].high = 200;
-  contextCandles[13].close = 85;
   contextCandles[20].close = 110;
 
   contextCandles.forEach(candle => {
