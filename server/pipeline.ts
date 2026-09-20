@@ -25,6 +25,7 @@ import { getPipSize, calculateDistance, detectAssetClass, isBoxTooNarrow } from 
 import { consolidateCandidates } from '../src/poiConsolidator';
 import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
+import { isPoiInvalidated as evaluatePoiInvalidation } from '../src/poiValidity';
 import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
 
 export interface NotificationCandidate {
@@ -403,7 +404,7 @@ export function runPipeline(
     }
 
     // POI invalidation is an admission gate, not telemetry-only.
-    if (isPoiInvalidated(tradeDirection, ob.low, ob.high, validationCandle.close, symbol)) {
+    if (evaluatePoiInvalidation(tradeDirection, ob.low, ob.high, validationCandle.close, getPipSize(symbol))) {
       reject('poi_invalidated');
       observePoiLifecycle('OB', ob, formedTimestamp, ['poi_invalidated']);
       continue;
@@ -595,7 +596,7 @@ export function runPipeline(
     }
 
     // POI invalidation is an admission gate, not telemetry-only.
-    if (isPoiInvalidated(tradeDirection, fvg.gapLow, fvg.gapHigh, validationCandle.close, symbol)) {
+    if (evaluatePoiInvalidation(tradeDirection, fvg.gapLow, fvg.gapHigh, validationCandle.close, getPipSize(symbol))) {
       reject('poi_invalidated');
       observePoiLifecycle('FVG', fvg, formedTimestamp, ['poi_invalidated']);
       continue;
@@ -728,19 +729,6 @@ export function runPipeline(
   }
 
   return finish(consolidateCandidates(candidates));
-}
-
-function isPoiInvalidated(
-  tradeDirection: 'long' | 'short',
-  zoneLow: number,
-  zoneHigh: number,
-  validationClose: number,
-  symbol: string
-): boolean {
-  const tolerance = getPipSize(symbol);
-  return tradeDirection === 'long'
-    ? validationClose < zoneLow - tolerance
-    : validationClose > zoneHigh + tolerance;
 }
 
 function isStructureEventUsable(event: import('../src/types').StructureEvent, currentIndex: number): boolean {
