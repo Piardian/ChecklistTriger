@@ -80,6 +80,7 @@ export function researchPoiInputBase(input: {
   poiType: 'OB' | 'FVG';
   poi: OrderBlock | FVG;
   observedAt: number;
+  formedTimestamp: number;
   pd4H: PremiumDiscountState;
   pd1H: PremiumDiscountState;
   pd15M: PremiumDiscountState;
@@ -105,7 +106,7 @@ export function researchPoiInputBase(input: {
   setupQualityVersion?: string | null;
 }): Omit<ResearchPoiEvaluation, 'schemaVersion' | 'recordId'> {
   const formedIndex = input.poiType === 'OB' ? input.poi.formedAtIndex : input.poi.middleCandleIndex;
-  const formedTimestamp = input.poiType === 'OB' ? input.poi.relatedEvent.brokenSwing.timestamp : input.poi.relatedEvent.brokenSwing.timestamp;
+  const formedTimestamp = input.formedTimestamp;
   const zone = input.poiType === 'OB'
     ? { low: input.poi.low, high: input.poi.high }
     : { low: input.poi.gapLow, high: input.poi.gapHigh };
