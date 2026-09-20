@@ -126,6 +126,7 @@ export function scoreDisplacementQuality(
   // ----------------------------------------------------
   // Total Score and Quality Grading
   // ----------------------------------------------------
+  const sizeRatio = priorAvgRange > 0 ? legAvgRange / priorAvgRange : null;
   const totalScore = bodyRatioScore + consecutiveScore + fvgScore + sizeScore;
 
   let quality: 'güçlü' | 'orta' | 'zayıf' | 'yok';
@@ -154,5 +155,12 @@ export function scoreDisplacementQuality(
     totalScore,
     quality,
     gradePoints,
+    avgBodyRatio,
+    consecutiveCount,
+    fvgCount: fvgs.length,
+    rawImbalanceDetected: fvgs.length === 0 && fvgScore > 0,
+    legAvgRange,
+    priorAvgRange,
+    sizeRatio,
   };
 }
