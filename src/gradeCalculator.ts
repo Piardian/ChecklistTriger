@@ -20,8 +20,6 @@ export interface GradeInput {
   pd15M?: PremiumDiscountState;
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
-  readonly rulebookVersion: typeof GRADE_RULEBOOK_VERSION;
-  readonly rulebook: ReturnType<typeof getGradeRulebookSnapshot>;
 }
 
 export interface GradeResult {
@@ -43,6 +41,8 @@ export interface GradeResult {
   }>;
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
+  readonly rulebookVersion: typeof GRADE_RULEBOOK_VERSION;
+  readonly rulebook: ReturnType<typeof getGradeRulebookSnapshot>;
 }
 
 /**
