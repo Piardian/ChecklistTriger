@@ -28,6 +28,7 @@ import { assessPresentationV1 } from '../src/presentationAssessment';
 import { FVG, OrderBlock } from '../src/types';
 import { evaluateHardMarketWindow, isWithinKillzone } from './killzone';
 import { resolveMarketSession } from '../src/marketSession';
+import { getPipSize } from '../src/assetMetrics';
 
 const defaultStore = new JsonlEvidenceStore();
 
@@ -484,7 +485,7 @@ function calculateAtrPips(
   symbol: string
 ): number | null {
   if (currentIndex < 1) return null;
-  const pip = symbol.includes('JPY') ? 0.01 : 0.0001;
+  const pip = getPipSize(symbol);
   const start = Math.max(1, currentIndex - 13);
   const ranges: number[] = [];
   for (let index = start; index <= currentIndex; index += 1) {
