@@ -58,6 +58,7 @@ export interface NotificationCandidate {
   admissionProfile?: 'PRODUCTION' | 'PVP_ACCELERATION';
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
+  macroContext?: import('./macroContext').MacroContext;
 }
 
 export function runPipeline(
@@ -520,6 +521,7 @@ export function runPipeline(
         admissionProfile: admissionProfile(),
         liquidityMagnet,
         opposingObstacle,
+        macroContext: researchMacroContext,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
@@ -704,6 +706,7 @@ export function runPipeline(
         admissionProfile: admissionProfile(),
         liquidityMagnet,
         opposingObstacle,
+        macroContext: researchMacroContext,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
