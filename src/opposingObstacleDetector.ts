@@ -122,7 +122,7 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
       for (const ob of input.activeOrderBlocks1h ?? []) {
         if (ob.direction !== 'bearish' || ob.low <= entryTop || ob.low > maxObstaclePrice) continue;
         const lifecycle = getLifecycle('OB', ob.formedAtIndex, ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bearish');
-        if (lifecycle.lifecycle === 'INVALIDATED') continue;
+        if (lifecycle.lifecycle !== 'ACTIVE') continue;
         const dist = Math.round(((ob.low - entryTop) / pip) * 10) / 10;
         return { hasObstacle: true, obstacleType: 'OB', timeframe: '1h', level: { low: ob.low, high: ob.high }, distancePips: dist, ...lifecycle,
           warningText: 'Karsi Engel: ' + dist + ' pip yukarida 1H Bearish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')' };
