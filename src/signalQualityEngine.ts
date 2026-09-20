@@ -1,4 +1,6 @@
 import { FVG, OrderBlock } from './types';
+import { getPipSize } from './assetMetrics';
+import { resolveMarketSession } from './marketSession';
 
 export const SIGNAL_QUALITY_RESULT_VERSION = 1 as const;
 export const SIGNAL_QUALITY_REASON_SOURCE = 'SignalQualityEngine' as const;
@@ -49,9 +51,9 @@ export interface SignalQualityInput {
   currentPrice: number;
   currentTimestamp: number;
   poiTestCount: number;
+  symbol: string;
 }
 
-const PIP_SIZE = 0.0001;
 const FRESH_BARS_LIMIT = 24;
 const STALE_BARS_LIMIT = 72;
 const NEAR_POI_PIPS = 15;
@@ -61,7 +63,7 @@ export function evaluateSignalQuality(input: SignalQualityInput): SignalQualityR
   const zone = resolvePoiZone(input.poiType, input.poi);
   const barsSinceFormation = Math.max(0, input.currentIndex - zone.formedAtIndex);
   const barsSinceBreak = Math.max(0, input.currentIndex - zone.breakCandleIndex);
-  const distanceToPoiPips = roundToOneDecimal(calculateDistanceToZonePips(input.currentPrice, zone.high, zone.low));
+  const distanceToPoiPips = roundToOneDecimal(calculateDistanceToZonePips(input.currentPrice, zone.high, zone.low, getPipSize(input.symbol)));
   const poiRelation = resolvePoiRelation(input.currentPrice, zone.high, zone.low);
   const isFresh = barsSinceFormation <= FRESH_BARS_LIMIT;
   const isNearPoi = distanceToPoiPips <= NEAR_POI_PIPS;
@@ -161,10 +163,11 @@ function resolvePoiZone(poiType: 'OB' | 'FVG', poi: OrderBlock | FVG): {
   };
 }
 
-function calculateDistanceToZonePips(price: number, zoneHigh: number, zoneLow: number): number {
+function calculateDistanceToZonePips(price: number, zoneHigh: number, zoneLow: number, pipSize: number): number {
   if (price >= zoneLow && price <= zoneHigh) return 0;
-  if (price > zoneHigh) return (price - zoneHigh) / PIP_SIZE;
-  return (zoneLow - price) / PIP_SIZE;
+  if (pipSize <= 0) return 0;
+  if (price > zoneHigh) return (price - zoneHigh) / pipSize;
+  return (zoneLow - price) / pipSize;
 }
 
 function resolvePoiRelation(price: number, zoneHigh: number, zoneLow: number): PoiRelation {
@@ -183,48 +186,15 @@ function resolveInvalidationRisk(
 }
 
 function resolveMarketContext(timestamp: number): SignalQualityResult['marketContext'] {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Europe/Istanbul',
-    weekday: 'short',
-    hour: 'numeric',
-    hour12: false,
-  }).formatToParts(new Date(timestamp));
-
-  const weekday = parts.find(p => p.type === 'weekday')?.value ?? 'Sun';
-  let hourTR = Number(parts.find(p => p.type === 'hour')?.value ?? 0);
-  if (hourTR === 24) hourTR = 0;
-
-  const dayOfWeek = weekdayToNumber(weekday);
-  const session = resolveSession(hourTR);
-  const killzone = dayOfWeek >= 1 && dayOfWeek <= 5 && ((hourTR >= 10 && hourTR < 13) || (hourTR >= 15 && hourTR < 19));
-
+  const context = resolveMarketSession(timestamp);
+  const killzone = context.dayOfWeek >= 1 && context.dayOfWeek <= 5 &&
+    ((context.hourLocal >= 10 && context.hourLocal < 13) || (context.hourLocal >= 15 && context.hourLocal < 19));
   return {
-    session,
+    session: context.session,
     killzone,
-    dayOfWeek,
-    hourTR,
+    dayOfWeek: context.dayOfWeek,
+    hourTR: context.hourLocal,
   };
-}
-
-function resolveSession(hourTR: number): SignalQualitySession {
-  if (hourTR >= 10 && hourTR < 13) return 'london';
-  if (hourTR >= 15 && hourTR < 19) return 'new_york';
-  if (hourTR >= 13 && hourTR < 15) return 'overlap';
-  if (hourTR >= 3 && hourTR < 10) return 'asian';
-  return 'off_session';
-}
-
-function weekdayToNumber(weekday: string): number {
-  const map: Record<string, number> = {
-    Mon: 1,
-    Tue: 2,
-    Wed: 3,
-    Thu: 4,
-    Fri: 5,
-    Sat: 6,
-    Sun: 0,
-  };
-  return map[weekday] ?? 0;
 }
 
 function resolveStatus(score: number, warnings: SignalQualityReason[]): SignalQualityStatus {
