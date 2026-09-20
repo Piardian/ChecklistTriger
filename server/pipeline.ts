@@ -729,7 +729,69 @@ export function runPipeline(
     }
   }
 
-  return finish(consolidateCandidates(candidates));
+  const consolidatedCandidates = consolidateCandidates(candidates);
+  recordConsolidationRejections(candidates, consolidatedCandidates);
+  return finish(consolidatedCandidates);
+  
+  function recordConsolidationRejections(
+    allCandidates: readonly NotificationCandidate[],
+    selectedCandidates: readonly NotificationCandidate[]
+  ): void {
+    const selectedKeys = new Set(selectedCandidates.map(candidate => candidate.uniqueKey));
+    for (const candidate of allCandidates) {
+      if (selectedKeys.has(candidate.uniqueKey)) continue;
+
+      const zone = candidate.poiType === 'OB'
+        ? { low: (candidate.poi as OrderBlock).low, high: (candidate.poi as OrderBlock).high }
+        : { low: (candidate.poi as FVG).gapLow, high: (candidate.poi as FVG).gapHigh };
+      const atrPips = averageTrueRangePips(candles15mCast, lastIndex15m, symbol, 14);
+      const displacement = scoreDisplacementQuality(
+        candles15mCast,
+        findDisplacementLeg(candles15mCast, candidate.poi.relatedEvent),
+        symbol,
+        '15m'
+      );
+      const oppositeStructureEventsSinceOrigin = structureState15m.events
+        .filter(event =>
+          event.breakTimestamp > candidate.poi.relatedEvent.breakTimestamp &&
+          !poiSupportsTradeDirection(candidate.tradeDirection, event.direction)
+        )
+        .map(event => ({ type: event.type, direction: event.direction, timestamp: event.breakTimestamp }));
+
+      appendResearchPoiEvaluation(researchPoiInputBase({
+        symbol,
+        direction: candidate.tradeDirection,
+        poiType: candidate.poiType,
+        poi: candidate.poi,
+        formedTimestamp: candidate.poiFormedTimestamp,
+        observedAt: candidate.marketDataTimestamp ?? candles15mCast[lastIndex15m].timestamp,
+        pd4H,
+        pd1H,
+        pd15M,
+        bias4H,
+        bias1H,
+        bias15M: structureState15m.currentTrend,
+        distancePips: distanceToZonePips(symbol, candidate.currentPrice, zone.low, zone.high),
+        distanceAtr: atrPips === null || atrPips === 0
+          ? null
+          : distanceToZonePips(symbol, candidate.currentPrice, zone.low, zone.high) / atrPips,
+        atrPips,
+        oppositeStructureEventsSinceOrigin,
+        poiTestCount: candidate.poiTestCount,
+        displacement,
+        modelState: candidate.modelState ?? null,
+        triggeringSweep: candidate.modelState?.triggeringSweep ?? null,
+        liquidityMagnet: candidate.liquidityMagnet ?? null,
+        opposingObstacle: candidate.opposingObstacle ?? null,
+        grade: candidate.gradeResult,
+        signalQuality: candidate.signalQualityResult ?? null,
+        setupAssessmentV2: candidate.setupAssessmentV2 ?? null,
+        blockingRules: ['poi_consolidation'],
+        stage: 'CONSOLIDATED_REJECTED',
+        setupQualityVersion: candidate.setupAssessmentV2?.decision.rulebookVersion ?? null,
+      }));
+    }
+  }
 }
 
 function isStructureEventUsable(event: import('../src/types').StructureEvent, currentIndex: number): boolean {
