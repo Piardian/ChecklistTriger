@@ -6,6 +6,7 @@ import { runPipeline } from '../server/pipeline';
 import { Candle, SwingPoint } from '../src/types';
 import * as scorerModule from '../src/displacementQualityScorer';
 import * as telemetryModule from '../server/telemetry';
+import * as gradeModule from '../src/gradeCalculator';
 
 describe('Pipeline Orchestrator', () => {
   const testDir = path.join(__dirname, 'temp_pipeline_test');
@@ -113,10 +114,16 @@ describe('Pipeline Orchestrator', () => {
     const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
     // First run should trigger notifications.
     const filterTelemetry = jest.spyOn(telemetryModule, 'recordPipelineFilterTelemetry');
+    const gradeSpy = jest.spyOn(gradeModule, 'calculateGrade');
     const res1 = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
     if (res1.length === 0) {
       console.log('[PIPELINE_DIAGNOSTIC] ' + JSON.stringify(filterTelemetry.mock.calls.map(call => call[0])));
+      console.log('[GRADE_DIAGNOSTIC] ' + JSON.stringify(gradeSpy.mock.calls.map((call, index) => ({
+        input: call[0],
+        result: gradeSpy.mock.results[index]?.value,
+      }))));
     }
+    gradeSpy.mockRestore();
     filterTelemetry.mockRestore();
     expect(res1.length).toBeGreaterThan(0);
     expect(res1[0].gradeResult.entryAllowed).toBe(true);
