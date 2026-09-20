@@ -45,6 +45,7 @@ export function detectLiquidityMagnet(
     const highs = swings.filter(s => s.type === 'high' && s.price > currentPrice);
     if (highs.length < 2) return null;
 
+    const candidates: LiquidityMagnet[] = [];
     for (let i = 0; i < highs.length; i++) {
       const cluster = [highs[i]];
       for (let j = i + 1; j < highs.length; j++) {
@@ -57,7 +58,7 @@ export function detectLiquidityMagnet(
         const avgPrice = cluster.reduce((sum, s) => sum + s.price, 0) / cluster.length;
         const distancePips = Math.round(((avgPrice - currentPrice) / pip) * 10) / 10;
         const firstTakenAt = findTakenAt('EQH', avgPrice, cluster, candles, currentIndex);
-        return {
+        candidates.push({
           type: 'EQH',
           priceLevel: avgPrice,
           pointsCount: cluster.length,
@@ -67,13 +68,15 @@ export function detectLiquidityMagnet(
           firstTakenAt,
           sourceSwingTimestamps: cluster.map(point => point.timestamp),
           description: `EQH (Esit Tepeler - BSL Miknatisi): ${cluster.length} tepe @ ${avgPrice.toFixed(4)} (${distancePips} pip yukarida)`,
-        };
+        });
       }
     }
+    return selectBestMagnet(candidates);
   } else {
     const lows = swings.filter(s => s.type === 'low' && s.price < currentPrice);
     if (lows.length < 2) return null;
 
+    const candidates: LiquidityMagnet[] = [];
     for (let i = 0; i < lows.length; i++) {
       const cluster = [lows[i]];
       for (let j = i + 1; j < lows.length; j++) {
@@ -86,7 +89,7 @@ export function detectLiquidityMagnet(
         const avgPrice = cluster.reduce((sum, s) => sum + s.price, 0) / cluster.length;
         const distancePips = Math.round(((currentPrice - avgPrice) / pip) * 10) / 10;
         const firstTakenAt = findTakenAt('EQL', avgPrice, cluster, candles, currentIndex);
-        return {
+        candidates.push({
           type: 'EQL',
           priceLevel: avgPrice,
           pointsCount: cluster.length,
@@ -96,12 +99,26 @@ export function detectLiquidityMagnet(
           firstTakenAt,
           sourceSwingTimestamps: cluster.map(point => point.timestamp),
           description: `EQL (Esit Dipler - SSL Miknatisi): ${cluster.length} dip @ ${avgPrice.toFixed(4)} (${distancePips} pip asagida)`,
-        };
+        });
       }
     }
+    return selectBestMagnet(candidates);
   }
 
   return null;
+}
+
+
+function selectBestMagnet(candidates: readonly LiquidityMagnet[]): LiquidityMagnet | null {
+  if (candidates.length === 0) return null;
+
+  return [...candidates].sort((a, b) => {
+    // Active liquidity is actionable; taken liquidity remains fallback context.
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
+    if (a.distancePips !== b.distancePips) return a.distancePips - b.distancePips;
+    if (a.pointsCount !== b.pointsCount) return b.pointsCount - a.pointsCount;
+    return a.priceLevel - b.priceLevel;
+  })[0];
 }
 
 function findTakenAt(
