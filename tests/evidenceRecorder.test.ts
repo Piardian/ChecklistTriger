@@ -182,6 +182,25 @@ function candidate(): NotificationCandidate {
     pd1H: 'discount',
     pd15M: 'discount',
     admissionProfile: 'PRODUCTION',
+    modelState: {
+      model: 'model2_continuation',
+      regime: 'bullish',
+      triggeringSweep: null,
+      triggeringBOS: {
+        type: 'BOS',
+        direction: 'bullish',
+        brokenSwing: {
+          type: 'high',
+          price: 1.103,
+          formedAtIndex: 0,
+          confirmedAtIndex: 1,
+          timestamp: 1000,
+        },
+        breakCandleIndex: 1,
+        breakTimestamp: 2000,
+        breakClosePrice: 1.106,
+      },
+    },
   };
 }
 
