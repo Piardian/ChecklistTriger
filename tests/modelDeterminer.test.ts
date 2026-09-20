@@ -44,6 +44,44 @@ describe('Model Determiner (Model 1 & 2)', () => {
   });
 
 
+  test('Model 1: should activate on a matching sweep before a focused CHoCH', () => {
+    const transitions: RegimeTransition[] = [
+      { atIndex: 2, newTrend: 'bearish' },
+      { atIndex: 7, newTrend: 'bullish' },
+    ];
+    const structureState: StructureState = {
+      currentTrend: 'bullish',
+      events: [],
+      lastEvent: null,
+      regimeTransitions: transitions,
+    };
+    const focusEvent: StructureEvent = {
+      type: 'CHoCH',
+      direction: 'bullish',
+      brokenSwing: {
+        type: 'high',
+        price: 1.0500,
+        formedAtIndex: 5,
+        confirmedAtIndex: 7,
+        timestamp: 5000,
+      },
+      breakCandleIndex: 7,
+      breakTimestamp: 7000,
+      breakClosePrice: 1.0520,
+    };
+    const sweeps: SweepEvent[] = [
+      { ...dummySweep(4), type: 'sweep_low' },
+      { ...dummySweep(6), type: 'sweep_high' },
+    ];
+
+    const result = determineModel(structureState, sweeps, 7, focusEvent);
+
+    expect(result.model).toBe('model1_reversal');
+    expect(result.regime).toBe('bearish');
+    expect(result.triggeringSweep?.type).toBe('sweep_low');
+    expect(result.triggeringSweep?.candleIndex).toBe(4);
+  });
+
   test('Model 1: should ignore a sweep in the wrong direction for the focused structure event', () => {
     const transitions: RegimeTransition[] = [{ atIndex: 2, newTrend: 'range' }];
     const structureState: StructureState = {
