@@ -321,7 +321,7 @@ export function calculateGrade(input: GradeInput): GradeResult {
     (input.displacementQuality15m !== null && input.displacementQuality15m.gradePoints >= GRADE_RULES.minEntry.displacementGradePoints) &&
     input.poiTestCount <= GRADE_RULES.minEntry.maxPoiTests &&
     input.has15mEvent &&
-    !(input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= 15);
+    !(input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= GRADE_RULES.caps.immediateObstacleDistancePips);
 
   const entryAllowed = blockReasons.length === 0 && (grade === 'A+' || grade === 'A') && meetsCategoryMinimums;
 
