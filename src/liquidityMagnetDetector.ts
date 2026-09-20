@@ -7,9 +7,9 @@ export interface LiquidityMagnet {
   pointsCount: number;
   distancePips: number;
   isActive: boolean;
-  status: 'ACTIVE' | 'TAKEN' | 'INVALIDATED';
-  firstTakenAt: number | null;
-  sourceSwingTimestamps: readonly number[];
+  status?: 'ACTIVE' | 'TAKEN' | 'INVALIDATED';
+  firstTakenAt?: number | null;
+  sourceSwingTimestamps?: readonly number[];
   description: string;
 }
 function getTolerance(symbol: string, refPrice: number): number {
