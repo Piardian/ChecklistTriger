@@ -96,6 +96,7 @@ export interface SignalMarketContextEvidence {
     readonly reason: string;
   };
   readonly marketRegime: string | null;
+  readonly macroContext?: import('../server/macroContext').MacroContext;
 }
 
 export interface SignalClassificationEvidence {
