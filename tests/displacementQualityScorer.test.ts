@@ -151,6 +151,15 @@ describe('Displacement Quality Scorer', () => {
     for (let i = 5; i <= 7; i++) {
       candles[i] = { timestamp: i * 1000, open: 1.0496, high: 1.0505, low: 1.0495, close: 1.0502 }; // body 60%
     }
+    // Preserve a small raw imbalance in the pre-break window:
+    // candle 5 high 1.0505 < candle 7 low 1.0506.
+    candles[7] = {
+      timestamp: 7000,
+      open: 1.0507,
+      high: 1.0516,
+      low: 1.0506,
+      close: 1.0513,
+    };
     result = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
     expect(result!.totalScore).toBe(2.5);
     expect(result!.quality).toBe('orta');
