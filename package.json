@@ -17,7 +17,6 @@
     "replay:market:all": "ts-node server/runHistoricalMarketReplayBatch.ts",
     "data:download": "ts-node server/downloadHistoricalData.ts",
     "data:validate": "ts-node server/validateHistoricalData.ts"
-    }
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
