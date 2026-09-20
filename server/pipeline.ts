@@ -26,7 +26,7 @@ import { consolidateCandidates } from '../src/poiConsolidator';
 import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
 import { isPoiInvalidated as evaluatePoiInvalidation } from '../src/poiValidity';
-import { getPoiTtlMs, getMinimumDisplacementGradePoints, getDistanceRule } from '../src/smcAdmissionRulebook';
+import { SMC_ADMISSION_RULEBOOK_VERSION, getPoiTtlMs, getMinimumDisplacementGradePoints, getDistanceRule } from '../src/smcAdmissionRulebook';
 import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
 
 export interface NotificationCandidate {
@@ -57,6 +57,7 @@ export interface NotificationCandidate {
   setupAssessmentV2?: SetupAssessment;
   setupAssessmentComparison?: SetupAssessmentComparison;
   admissionProfile?: 'PRODUCTION' | 'PVP_ACCELERATION';
+  admissionRulebookVersion?: string;
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
   modelState?: ModelState | null;
@@ -526,6 +527,7 @@ export function runPipeline(
         setupAssessmentV2,
         setupAssessmentComparison,
         admissionProfile: admissionProfile(),
+        admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
           modelState,
