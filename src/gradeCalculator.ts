@@ -41,8 +41,8 @@ export interface GradeResult {
   }>;
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
-  readonly rulebookVersion: typeof GRADE_RULEBOOK_VERSION;
-  readonly rulebook: ReturnType<typeof getGradeRulebookSnapshot>;
+  readonly rulebookVersion?: typeof GRADE_RULEBOOK_VERSION;
+  readonly rulebook?: ReturnType<typeof getGradeRulebookSnapshot>;
 }
 
 /**
