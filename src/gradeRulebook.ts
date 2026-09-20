@@ -2,7 +2,7 @@ export const GRADE_RULEBOOK_VERSION = 'GradeRulebook.v2' as const;
 
 export const GRADE_RULES = Object.freeze({
   thresholds: Object.freeze({ aPlus: 8, a: 6, bPlus: 4, b: 2 }),
-  poi: Object.freeze({ overtestedAt: 2, vetoAt: 3, freshCount: 0 }),
+  poi: Object.freeze({ overtestedAt: 2, vetoAt: 3, freshCount: 0, reversalSweepMinTests: 1 }),
   aPlus: Object.freeze({
     maxTests: 0,
     requireStrongDisplacement: true,
