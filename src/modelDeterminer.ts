@@ -58,6 +58,45 @@ export function determineModel(
   const matchingTransitions = validTransitions.filter(t => t.newTrend === currentTrendAtIdx);
   const regimeStartIndex = matchingTransitions[matchingTransitions.length - 1].atIndex;
 
+  // Model 1: Reversal. A CHoCH is the structure confirmation of a
+  // reversal, so evaluate the liquidity sweep that occurred during the
+  // immediately preceding regime rather than requiring the current regime
+  // to still be range.
+  if (focusEvent?.type === 'CHoCH') {
+    const priorTransitions = validTransitions.filter(
+      transition => transition.atIndex < focusEvent.breakCandleIndex
+    );
+    const priorTransition = priorTransitions[priorTransitions.length - 1];
+
+    if (priorTransition) {
+      const priorRegime = priorTransition.newTrend;
+      const priorRegimeStartIndex = priorTransitions
+        .filter(transition => transition.newTrend === priorRegime)
+        .at(-1)?.atIndex ?? priorTransition.atIndex;
+
+      const expectedSweepType = focusEvent.direction === 'bullish'
+        ? 'sweep_low'
+        : 'sweep_high';
+
+      const validReversalSweeps = sweepEvents.filter(
+        sweep =>
+          sweep.type === expectedSweepType &&
+          sweep.candleIndex >= priorRegimeStartIndex &&
+          sweep.candleIndex < focusEvent.breakCandleIndex &&
+          sweep.candleIndex <= currentIndex
+      );
+
+      if (validReversalSweeps.length > 0) {
+        return {
+          model: 'model1_reversal',
+          regime: priorRegime,
+          triggeringSweep: validReversalSweeps[validReversalSweeps.length - 1],
+          triggeringBOS: null,
+        };
+      }
+    }
+  }
+
   // Model 1: Range + Sweep
   if (currentTrendAtIdx === 'range') {
     const expectedSweepType =
