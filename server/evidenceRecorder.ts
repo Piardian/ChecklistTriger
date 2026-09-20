@@ -292,6 +292,7 @@ export function buildSignalEvidenceRecord(
       volatilityAtr: calculateAtrPips(candles15m, eventCandle ? candles15m.indexOf(eventCandle) : candles15m.length - 1, candidate.symbol),
       marketWindowState: marketWindowStatus,
       marketRegime: candidate.setupAssessmentV2?.context.marketPhase.value ?? null,
+      macroContext: candidate.macroContext,
     },
     ...(candidate.signalQualityResult ? { signalQuality: candidate.signalQualityResult } : {}),
     ...(candidate.setupAssessmentV2 && candidate.setupAssessmentComparison ? {
