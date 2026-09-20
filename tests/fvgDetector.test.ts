@@ -63,6 +63,23 @@ describe('FVG Detector', () => {
     expect(fvgs).toHaveLength(0);
   });
 
+  test('should never use the candle after the structure break to create an FVG', () => {
+    const candles: Candle[] = [
+      { timestamp: 0, open: 1.0500, high: 1.0502, low: 1.0498, close: 1.0500 },
+      { timestamp: 1000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 },
+      { timestamp: 2000, open: 1.0520, high: 1.0530, low: 1.0520, close: 1.0525 }, // structure break
+      { timestamp: 3000, open: 1.0530, high: 1.0600, low: 1.0590, close: 1.0595 }, // future candle
+    ];
+
+    const event = dummyEvent(2, 'bullish');
+    const leg: DisplacementLeg = { startIndex: 1, endIndex: 2, direction: 'bullish' };
+
+    // Any gap requiring candle 3 must be unavailable at the break event.
+    const fvgs = detectFVGsInLeg(candles, leg, 'EURUSD', '15m', event);
+
+    expect(fvgs).toHaveLength(0);
+  });
+
   test('should detect multiple FVGs in one leg', () => {
     const candles: Candle[] = [
       { timestamp: 0, open: 1.0500, high: 1.0500, low: 1.0500, close: 1.0500 }, // i=0
