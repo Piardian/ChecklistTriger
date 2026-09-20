@@ -167,7 +167,7 @@ describe('Displacement Quality Scorer', () => {
 
     // Setup 3: Total = 1.5 (body = 0, consecutive = 1, size = 0.5, fvg = 0) -> zayıf (0)
     // Remove raw imbalance
-    candles[4].high = 1.0502; // restore to 1.0502 to avoid shrinking size score
+    candles[4].high = 1.0505; // restore the prior candle to the 10-pip baseline for a 1.0x size ratio
     candles[8].low = 1.0500;  // no gap at index 7
     // body to weak
     for (let i = 5; i <= 7; i++) {
