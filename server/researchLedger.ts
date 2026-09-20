@@ -105,11 +105,13 @@ export function researchPoiInputBase(input: {
   stage: ResearchEvaluationStage;
   setupQualityVersion?: string | null;
 }): Omit<ResearchPoiEvaluation, 'schemaVersion' | 'recordId'> {
-  const formedIndex = input.poiType === 'OB' ? input.poi.formedAtIndex : input.poi.middleCandleIndex;
+  const formedIndex = input.poiType === 'OB'
+    ? (input.poi as OrderBlock).formedAtIndex
+    : (input.poi as FVG).middleCandleIndex;
   const formedTimestamp = input.formedTimestamp;
   const zone = input.poiType === 'OB'
-    ? { low: input.poi.low, high: input.poi.high }
-    : { low: input.poi.gapLow, high: input.poi.gapHigh };
+    ? { low: (input.poi as OrderBlock).low, high: (input.poi as OrderBlock).high }
+    : { low: (input.poi as FVG).gapLow, high: (input.poi as FVG).gapHigh };
   return {
     observedAt: input.observedAt, cutoffTimestamp: input.observedAt, stage: input.stage,
     symbol: input.symbol, timeframe: '15m', direction: input.direction, poiType: input.poiType,
