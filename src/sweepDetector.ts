@@ -9,8 +9,8 @@ export interface SweepEvent {
   candleIndex: number;
   timestamp: number;
   wickPrice: number;
-  closePrice: number;
-  closeRelation: 'inside_range' | 'outside_range';
+  closePrice?: number;
+  closeRelation?: 'inside_range' | 'outside_range';
 }
 
 const MIN_SWEEP_PIPS: Record<string, Record<'15m' | '1h' | '4h', number>> = {
