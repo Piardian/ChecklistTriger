@@ -108,21 +108,23 @@ describe('Pipeline Orchestrator', () => {
     // Populate candleStore with separate 4H/1H context and 15M execution structure.
     appendPipelineCandles(candleStore, 'EURUSD', candles);
 
+    // Use a deterministic observation time so the 48-hour POI TTL is evaluated against the fixture, not wall-clock time.
+    const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
     // First run should trigger notifications
-    const res1 = runPipeline('EURUSD', candleStore, notifiedStore);
+    const res1 = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
     expect(res1.length).toBeGreaterThan(0);
     expect(res1[0].gradeResult.entryAllowed).toBe(true);
     expect(Object.prototype.hasOwnProperty.call(res1[0], 'signalQualityResult')).toBe(false);
 
     // Detection remains side-effect free until the delivery layer owns the candidate.
-    const res2 = runPipeline('EURUSD', candleStore, notifiedStore);
+    const res2 = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
     expect(res2.map(candidate => candidate.uniqueKey)).toEqual(res1.map(candidate => candidate.uniqueKey));
 
     for (const candidate of res1) {
       notifiedStore.markAsNotified(candidate.uniqueKey);
       if (candidate.dedupeKey) notifiedStore.markAsNotified(candidate.dedupeKey);
     }
-    expect(runPipeline('EURUSD', candleStore, notifiedStore)).toEqual([]);
+    expect(runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp)).toEqual([]);
   });
 
   test('should attach SignalQualityResult only when observer feature flag is enabled', () => {
@@ -177,7 +179,8 @@ describe('Pipeline Orchestrator', () => {
 
     appendPipelineCandles(candleStore, 'EURUSD', candles);
 
-    const res = runPipeline('EURUSD', candleStore, notifiedStore);
+    const analysisTimestamp = Date.UTC(2024, 5, 3, 12, 0, 0);
+    const res = runPipeline('EURUSD', candleStore, notifiedStore, analysisTimestamp);
 
     expect(res.length).toBeGreaterThan(0);
     expect(res[0].signalQualityResult?.version).toBe(1);
@@ -253,7 +256,8 @@ describe('Pipeline Orchestrator', () => {
       gradePoints: 2,
     });
 
-    const res = runPipeline('GBPUSD', candleStore, notifiedStore);
+    const analysisTimestamp = Date.UTC(2026, 5, 1, 0, 0, 0);
+    const res = runPipeline('GBPUSD', candleStore, notifiedStore, analysisTimestamp);
     expect(res.length).toBeGreaterThan(0);
 
     mockDq.mockRestore();
