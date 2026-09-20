@@ -9,6 +9,8 @@ export interface SweepEvent {
   candleIndex: number;
   timestamp: number;
   wickPrice: number;
+  closePrice: number;
+  closeRelation: 'inside_range' | 'outside_range';
 }
 
 const MIN_SWEEP_PIPS: Record<string, Record<'15m' | '1h' | '4h', number>> = {
@@ -89,14 +91,18 @@ export function detectSweeps(
       // If we haven't swept this rangeLow level yet
       if (sweptLowLevel !== rangeState.rangeLow) {
         const penetrationDistance = (rangeState.rangeLow - candle.low) / pipMultiplier;
-        events.push({
-          type: 'sweep_low',
-          sweptLevel: rangeState.rangeLow,
-          penetrationDistance,
-          candleIndex: idx,
-          timestamp: candle.timestamp,
-          wickPrice: candle.low,
-        });
+        if (candle.close > rangeState.rangeLow) {
+          events.push({
+            type: 'sweep_low',
+            sweptLevel: rangeState.rangeLow,
+            penetrationDistance,
+            candleIndex: idx,
+            timestamp: candle.timestamp,
+            wickPrice: candle.low,
+            closePrice: candle.close,
+            closeRelation: 'inside_range',
+          });
+        }
         sweptLowLevel = rangeState.rangeLow;
       }
     }
@@ -106,14 +112,18 @@ export function detectSweeps(
       // If we haven't swept this rangeHigh level yet
       if (sweptHighLevel !== rangeState.rangeHigh) {
         const penetrationDistance = (candle.high - rangeState.rangeHigh) / pipMultiplier;
-        events.push({
-          type: 'sweep_high',
-          sweptLevel: rangeState.rangeHigh,
-          penetrationDistance,
-          candleIndex: idx,
-          timestamp: candle.timestamp,
-          wickPrice: candle.high,
-        });
+        if (candle.close < rangeState.rangeHigh) {
+          events.push({
+            type: 'sweep_high',
+            sweptLevel: rangeState.rangeHigh,
+            penetrationDistance,
+            candleIndex: idx,
+            timestamp: candle.timestamp,
+            wickPrice: candle.high,
+            closePrice: candle.close,
+            closeRelation: 'inside_range',
+          });
+        }
         sweptHighLevel = rangeState.rangeHigh;
       }
     }
