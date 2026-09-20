@@ -319,23 +319,23 @@ function appendPipelineCandles(
 
   candles15m[18] = {
     timestamp: candles15m[18].timestamp,
-    open: 94,
-    high: 98,
-    low: 94,
+    open: 90,
+    high: 99,
+    low: 88,
     close: 96,
   };
   candles15m[19] = {
     timestamp: candles15m[19].timestamp,
-    open: 96,
-    high: 99,
-    low: 96,
-    close: 98,
+    open: 94,
+    high: 99.5,
+    low: 89,
+    close: 99,
   };
   candles15m[20] = {
     timestamp: candles15m[20].timestamp,
-    open: 98,
+    open: 99,
     high: 110,
-    low: 97,
+    low: 95,
     close: 110,
   };
 
