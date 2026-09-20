@@ -113,5 +113,49 @@ export function detectOpposingObstacle(input: ObstacleCheckInput): OpposingObsta
     }
   }
 
+
+  // 1H obstacle fallback: only reached when no valid 15M obstacle exists.
+  if (input.activeOrderBlocks1h || input.activeFVGs1h) {
+    if (input.tradeDirection === 'long') {
+      const entryTop = input.entryZone.high;
+      const maxObstaclePrice = entryTop + clearanceUnits;
+      for (const ob of input.activeOrderBlocks1h ?? []) {
+        if (ob.direction !== 'bearish' || ob.low <= entryTop || ob.low > maxObstaclePrice) continue;
+        const lifecycle = getLifecycle('OB', ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bearish');
+        if (lifecycle.lifecycle === 'INVALIDATED') continue;
+        const dist = Math.round(((ob.low - entryTop) / pip) * 10) / 10;
+        return { hasObstacle: true, obstacleType: 'OB', timeframe: '1h', level: { low: ob.low, high: ob.high }, distancePips: dist, ...lifecycle,
+          warningText: 'Karsi Engel: ' + dist + ' pip yukarida 1H Bearish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')' };
+      }
+      for (const fvg of input.activeFVGs1h ?? []) {
+        if (fvg.direction !== 'bearish' || fvg.gapLow <= entryTop || fvg.gapLow > maxObstaclePrice) continue;
+        const lifecycle = getLifecycle('FVG', fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bearish');
+        if (lifecycle.lifecycle === 'INVALIDATED') continue;
+        const dist = Math.round(((fvg.gapLow - entryTop) / pip) * 10) / 10;
+        return { hasObstacle: true, obstacleType: 'FVG', timeframe: '1h', level: { low: fvg.gapLow, high: fvg.gapHigh }, distancePips: dist, ...lifecycle,
+          warningText: 'Karsi Engel: ' + dist + ' pip yukarida 1H Bearish FVG mevcut (' + fvg.gapLow.toFixed(4) + ' - ' + fvg.gapHigh.toFixed(4) + ')' };
+      }
+    } else {
+      const entryBottom = input.entryZone.low;
+      const minObstaclePrice = entryBottom - clearanceUnits;
+      for (const ob of input.activeOrderBlocks1h ?? []) {
+        if (ob.direction !== 'bullish' || ob.high >= entryBottom || ob.high < minObstaclePrice) continue;
+        const lifecycle = getLifecycle('OB', ob.low, ob.high, input.candles1h, input.currentIndex1h, 'bullish');
+        if (lifecycle.lifecycle === 'INVALIDATED') continue;
+        const dist = Math.round(((entryBottom - ob.high) / pip) * 10) / 10;
+        return { hasObstacle: true, obstacleType: 'OB', timeframe: '1h', level: { low: ob.low, high: ob.high }, distancePips: dist, ...lifecycle,
+          warningText: 'Karsi Engel: ' + dist + ' pip asagida 1H Bullish OB mevcut (' + ob.low.toFixed(4) + ' - ' + ob.high.toFixed(4) + ')' };
+      }
+      for (const fvg of input.activeFVGs1h ?? []) {
+        if (fvg.direction !== 'bullish' || fvg.gapHigh >= entryBottom || fvg.gapHigh < minObstaclePrice) continue;
+        const lifecycle = getLifecycle('FVG', fvg.gapLow, fvg.gapHigh, input.candles1h, input.currentIndex1h, 'bullish');
+        if (lifecycle.lifecycle === 'INVALIDATED') continue;
+        const dist = Math.round(((entryBottom - fvg.gapHigh) / pip) * 10) / 10;
+        return { hasObstacle: true, obstacleType: 'FVG', timeframe: '1h', level: { low: fvg.gapLow, high: fvg.gapHigh }, distancePips: dist, ...lifecycle,
+          warningText: 'Karsi Engel: ' + dist + ' pip asagida 1H Bullish FVG mevcut (' + fvg.gapLow.toFixed(4) + ' - ' + fvg.gapHigh.toFixed(4) + ')' };
+      }
+    }
+  }
+
   return noObstacle;
 }
