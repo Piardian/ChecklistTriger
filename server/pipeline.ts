@@ -64,7 +64,8 @@ export interface NotificationCandidate {
 export function runPipeline(
   symbol: Symbol,
   candleStore: CandleStore,
-  notifiedStore: NotifiedStore
+  notifiedStore: NotifiedStore,
+  analysisTimestamp = Date.now()
 ): NotificationCandidate[] {
   const filterMetrics: {
     evaluatedPois: number;
@@ -158,12 +159,12 @@ export function runPipeline(
     return candidates;
   };
 
-  // 1. Pull 4h, 1h, 15m candles
-  const candles4H = candleStore.getCandles(symbol, '4h');
-  const candles1H = candleStore.getCandles(symbol, '1h');
-  const candles15m = candleStore.getCandles(symbol, '15m');
+  // 1. Pull 4h, 1h, 15m candles. SMC structure is evaluated only on closed candles.
+  const candles4H = filterClosedCandles(candleStore.getCandles(symbol, '4h'), 4 * 60 * 60 * 1000, analysisTimestamp);
+  const candles1H = filterClosedCandles(candleStore.getCandles(symbol, '1h'), 60 * 60 * 1000, analysisTimestamp);
+  const candles15m = filterClosedCandles(candleStore.getCandles(symbol, '15m'), 15 * 60 * 1000, analysisTimestamp);
 
-  // Guard: if any is empty or < 15 candles -> return []
+  // Guard: if any is empty or < 15 closed candles -> return []
   if (candles4H.length < 15 || candles1H.length < 15 || candles15m.length < 15) {
     reject('insufficient_candles');
     return finish([]);
@@ -206,7 +207,7 @@ export function runPipeline(
   maybeLogStructureDebug(candles15mCast, symbol);
   const lastIndex15m = candles15mCast.length - 1;
   const pd15M = calculatePremiumDiscount(candles15mCast, swings15m, lastIndex15m);
-  const validationCandle = latestCompletedCandle(candles15mCast);
+  const validationCandle = candles15mCast[lastIndex15m];
 
   const obs = detectAllOrderBlocks(candles15mCast, structureState15m.events);
   const fvgs = detectAllFVGs(candles15mCast, structureState15m.events, symbol, '15m');
@@ -738,9 +739,19 @@ function isStructureEventUsable(event: import('../src/types').StructureEvent, cu
     Number.isFinite(event.breakClosePrice);
 }
 
-function latestCompletedCandle(candles: readonly Candle[]): Candle {
-  const now = Date.now();
-  return [...candles].reverse().find(candle => candle.timestamp <= now) ?? candles[Math.max(0, candles.length - 2)];
+function filterClosedCandles(
+  candles: readonly Candle[],
+  candleDurationMs: number,
+  analysisTimestamp: number
+): Candle[] {
+  if (!Number.isFinite(analysisTimestamp) || candleDurationMs <= 0) {
+    return [];
+  }
+
+  return candles.filter(candle =>
+    Number.isFinite(candle.timestamp) &&
+    candle.timestamp + candleDurationMs <= analysisTimestamp
+  );
 }
 
 export const MAX_POI_AGE_MS = 48 * 60 * 60 * 1000; // 48 Hours POI TTL (Anti-Stale / Anti-Ghost POI)
