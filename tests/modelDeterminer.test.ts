@@ -43,6 +43,27 @@ describe('Model Determiner (Model 1 & 2)', () => {
     expect(result.triggeringBOS).toBeNull();
   });
 
+
+  test('Model 1: should ignore a sweep in the wrong direction for the focused structure event', () => {
+    const transitions: RegimeTransition[] = [{ atIndex: 2, newTrend: 'range' }];
+    const structureState: StructureState = {
+      currentTrend: 'range',
+      events: [],
+      lastEvent: null,
+      regimeTransitions: transitions,
+    };
+    const focusEvent = dummyBOS(5, 'bullish');
+    const sweeps: SweepEvent[] = [
+      { ...dummySweep(4), type: 'sweep_high' },
+      { ...dummySweep(4), type: 'sweep_low' },
+    ];
+
+    const result = determineModel(structureState, sweeps, 5, focusEvent);
+
+    expect(result.model).toBe('model1_reversal');
+    expect(result.triggeringSweep?.type).toBe('sweep_low');
+  });
+
   test('Model 1: should return none if regime is range but no sweep occurred within window', () => {
     const transitions: RegimeTransition[] = [
       { atIndex: 2, newTrend: 'range' },
