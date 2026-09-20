@@ -19,7 +19,26 @@ const PIP_SIZE = 0.0001;
 export function labelOutcome(input: OutcomeLabelInput): OutcomeResult {
   const { snapshot, futureCandles, config } = input;
   const evaluationWindow = futureCandles.slice(0, Math.max(0, config.expiryBars));
-  const entryPrice = snapshot.candidate.currentPrice;
+  const currentPrice = snapshot.candidate.currentPrice;
+
+  if (currentPrice === null) {
+    const startTimestamp = Date.parse(snapshot.timestamp);
+    return buildOutcome({
+      snapshot,
+      config,
+      status: 'UNKNOWN',
+      evaluatedCandles: 0,
+      startTimestamp,
+      endTimestamp: null,
+      resolvedAtTimestamp: null,
+      resolvedAtIndex: null,
+      maxFavorableExcursionPips: 0,
+      maxAdverseExcursionPips: 0,
+      evaluationCompleted: false,
+    });
+  }
+
+  const entryPrice = currentPrice;
   const direction = snapshot.candidate.tradeDirection;
   const levels = resolveLevels(entryPrice, direction, config);
 

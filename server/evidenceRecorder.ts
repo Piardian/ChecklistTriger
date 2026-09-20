@@ -14,14 +14,21 @@ import {
   CompletedSignalOutcomeEvidence,
   createCompletedSignalOutcomeEvidence,
   createSignalEvidenceRecord,
+  createSignalPricePathEvidenceRecord,
   SIGNAL_EVIDENCE_DETECTOR_VERSION,
   SIGNAL_EVIDENCE_ENGINE_VERSION,
   SIGNAL_EVIDENCE_GRADE_VERSION,
+  SIGNAL_EVIDENCE_SCHEMA_VERSION,
+  SIGNAL_EVIDENCE_STRATEGY_VERSION,
   SignalEvidenceRecord,
+  SignalPricePathEvidenceRecord,
 } from '../src/signalEvidence';
 import { evaluateSignalValidationGate } from '../src/signalValidationGate';
 import { assessPresentationV1 } from '../src/presentationAssessment';
 import { FVG, OrderBlock } from '../src/types';
+import { evaluateHardMarketWindow, isWithinKillzone } from './killzone';
+import { resolveMarketSession } from '../src/marketSession';
+import { getPipSize } from '../src/assetMetrics';
 
 const defaultStore = new JsonlEvidenceStore();
 
@@ -40,6 +47,20 @@ export function recordApprovedSignalEvidenceAsync(
   void store.appendSignalEvidence(record).catch(error => {
     console.warn(`[EvidenceRecorder] Signal evidence write failed for ${record.metadata.signalId}:`, error);
   });
+}
+
+export function recordSignalPricePathEvidenceAsync(
+  record: SignalPricePathEvidenceRecord,
+  store: EvidenceStore = defaultStore
+): void {
+  if (process.env.ENABLE_EVIDENCE_RECORDER === 'false') {
+    return;
+  }
+  if (store.appendPricePathEvidence) {
+    void store.appendPricePathEvidence(record).catch(error => {
+      console.warn(`[EvidenceRecorder] Price path evidence write failed for ${record.signalId}:`, error);
+    });
+  }
 }
 
 export interface SignalOperationalEvidence {
@@ -143,6 +164,43 @@ export function buildSignalEvidenceRecord(
   const benchmarkSummary = buildBenchmarkSummary(execution);
   const governanceSummary = buildGovernanceEvidenceSummary(candidate, recordedAt, communication);
 
+  const createdDate = new Date(createdAt);
+  const hourUtc = createdDate.getUTCHours();
+  const sessionContext = resolveMarketSession(createdAt);
+  const dayOfWeek = sessionContext.dayOfWeek;
+  const dayOfWeekName = sessionContext.dayOfWeekName;
+  const session = sessionContext.session === 'asian'
+    ? 'ASIA'
+    : sessionContext.session === 'london'
+      ? 'LONDON'
+      : sessionContext.session === 'overlap'
+        ? 'LONDON_NY_OVERLAP'
+        : sessionContext.session === 'new_york'
+          ? 'NEW_YORK'
+          : 'OFF_HOURS';
+
+  const killzoneStatus = isWithinKillzone(createdDate);
+  const marketWindowStatus = evaluateHardMarketWindow(createdDate, candidate.symbol);
+
+  const isLong = candidate.tradeDirection === 'long';
+  const targetBias = isLong ? 'bullish' : 'bearish';
+  const htfAlignmentState =
+    candidate.bias4H === targetBias && candidate.bias1H === targetBias
+      ? 'FULL_ALIGNMENT'
+      : candidate.bias4H === targetBias || candidate.bias1H === targetBias
+        ? 'PARTIAL_ALIGNMENT'
+        : (isLong && (candidate.bias4H === 'bearish' || candidate.bias1H === 'bearish')) ||
+          (!isLong && (candidate.bias4H === 'bullish' || candidate.bias1H === 'bullish'))
+          ? 'CONFLICT'
+          : 'NEUTRAL';
+
+  const midpoint = (zone.low + zone.high) / 2;
+  const poiAgeMs = Math.max(0, createdAt - candidate.poiFormedTimestamp);
+  const poiAgeBars = Math.floor(poiAgeMs / (15 * 60 * 1000));
+  const distanceFromCurrentPrice = Number.isFinite(candidate.currentPrice)
+    ? Math.abs(candidate.currentPrice - midpoint)
+    : undefined;
+
   return createSignalEvidenceRecord({
     metadata: {
       signalId,
@@ -151,9 +209,21 @@ export function buildSignalEvidenceRecord(
       symbol: candidate.symbol,
       direction: candidate.tradeDirection,
       timeframe: '15m',
+      strategyVersion: SIGNAL_EVIDENCE_STRATEGY_VERSION,
       engineVersion: SIGNAL_EVIDENCE_ENGINE_VERSION,
       detectorVersion: SIGNAL_EVIDENCE_DETECTOR_VERSION,
       gradeVersion: SIGNAL_EVIDENCE_GRADE_VERSION,
+      evidenceSchemaVersion: SIGNAL_EVIDENCE_SCHEMA_VERSION,
+    },
+    classification: {
+      strategy: 'SWING_BOS_CORE',
+      setupType: event.type === 'BOS' ? 'CONTINUATION' : 'REVERSAL',
+      poiType: candidate.poiType,
+      structureEvent: event.type,
+      grade: candidate.gradeResult.grade,
+      score: candidate.gradeResult.totalScore,
+      entryAllowed: candidate.gradeResult.entryAllowed,
+      rulebookVersion: candidate.gradeResult.rulebookVersion,
     },
     htfContext: {
       bias4H: candidate.bias4H,
@@ -161,34 +231,49 @@ export function buildSignalEvidenceRecord(
       pd4H: candidate.pd4H,
       pd1H: candidate.pd1H,
       pd15M: candidate.pd15M ?? null,
+      bias15M: candidate.setupAssessmentV2?.detector.structure.trend15m ?? null,
+      htfAlignmentState,
     },
     structure: {
       eventType: event.type,
       eventTimestamp: event.breakTimestamp,
       eventTimeframe: '15m',
       structureScore: candidate.gradeResult.breakdown.structure,
+      swingContext: {
+        brokenSwingType: event.brokenSwing.type,
+        brokenSwingPrice: event.brokenSwing.price,
+        formedAtIndex: event.brokenSwing.formedAtIndex,
+        confirmedAtIndex: event.brokenSwing.confirmedAtIndex,
+        timestamp: event.brokenSwing.timestamp,
+      },
     },
     poi: {
       poiType: candidate.poiType,
       timeframe: '15m',
       zoneHigh: zone.high,
       zoneLow: zone.low,
-      poiAgeMs: Math.max(0, (candidate.signalContext?.timestamp ?? event.breakTimestamp) - candidate.poiFormedTimestamp),
+      midpoint,
+      poiAgeMs,
+      poiAgeBars,
       poiTestCount: candidate.poiTestCount,
+      distanceFromCurrentPrice,
+      mitigationState: candidate.poiTestCount > 0 ? 'PARTIALLY_MITIGATED' : 'UNMITIGATED',
     },
     displacement: {
       displacementScore: candidate.gradeResult.breakdown.displacement,
       bodyPercentage: eventCandle ? calculateBodyPercentage(eventCandle) : null,
       range: eventCandle ? eventCandle.high - eventCandle.low : null,
       impulseDirection: event.direction,
+      atrNormalizedDisplacement: calculateAtrNormalizedDisplacement(candles15m, event.breakCandleIndex, eventCandle),
     },
     sweep: {
-      sweepDetected: candidate.gradeResult.breakdown.sweep > 0,
+      sweepDetected: Boolean(candidate.setupAssessmentV2?.detector.sweep.timestamp),
       sweepDirection: candidate.tradeDirection,
-      sweepQuality: sweepQuality(candidate.gradeResult.breakdown.sweep),
+      sweepQuality: candidate.setupAssessmentV2?.detector.sweep.timestamp ? 'strong' : 'missing',
     },
     model: {
-      modelState: modelState(candidate.gradeResult.breakdown.sweep),
+      modelState: candidate.modelState?.model && candidate.modelState.model !== 'none' ? 'confirmed' : 'missing',
+      modelType: candidate.modelState?.model ?? 'none',
       admissionProfile: candidate.admissionProfile ?? 'PRODUCTION',
     },
     grade: {
@@ -198,6 +283,19 @@ export function buildSignalEvidenceRecord(
       breakdown: candidate.gradeResult.breakdown,
       blockReasons: candidate.gradeResult.blockReasons,
     },
+    marketContext: {
+      session,
+      killzone: killzoneStatus,
+      dayOfWeek,
+      dayOfWeekName,
+      hourUtc,
+      hourLocal: sessionContext.hourLocal,
+      timezone: sessionContext.timezone,
+      volatilityAtr: calculateAtrPips(candles15m, eventCandle ? candles15m.indexOf(eventCandle) : candles15m.length - 1, candidate.symbol),
+      marketWindowState: marketWindowStatus,
+      marketRegime: candidate.setupAssessmentV2?.context.marketPhase.value ?? null,
+    },
+    ...(candidate.signalQualityResult ? { signalQuality: candidate.signalQualityResult } : {}),
     ...(candidate.setupAssessmentV2 && candidate.setupAssessmentComparison ? {
       setupAssessmentShadow: {
         version: candidate.setupAssessmentV2.version,
@@ -242,6 +340,8 @@ export function buildSignalEvidenceRecord(
         executionAllowed,
         reasonCode: firstRisk?.evaluation.reason.code ?? null,
         reasonMessage: firstRisk?.evaluation.reason.message ?? null,
+        theoreticalRiskDistance: Math.abs(zone.high - zone.low),
+        invalidationPrice: candidate.tradeDirection === 'long' ? zone.low : zone.high,
       },
     },
   });
@@ -377,6 +477,49 @@ function readPackageVersion(): string {
   } catch {
     return '0.0.0';
   }
+}
+
+function calculateAtrPips(
+  candles: readonly StoredCandle[],
+  currentIndex: number,
+  symbol: string
+): number | null {
+  if (currentIndex < 1) return null;
+  const pip = getPipSize(symbol);
+  const start = Math.max(1, currentIndex - 13);
+  const ranges: number[] = [];
+  for (let index = start; index <= currentIndex; index += 1) {
+    const candle = candles[index];
+    const previousClose = candles[index - 1].close;
+    ranges.push(Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previousClose),
+      Math.abs(candle.low - previousClose)
+    ));
+  }
+  return ranges.length === 0 ? null : ranges.reduce((sum, value) => sum + value, 0) / ranges.length / pip;
+}
+
+function calculateAtrNormalizedDisplacement(
+  candles: readonly StoredCandle[],
+  eventIndex: number,
+  eventCandle: StoredCandle | null
+): number | null {
+  if (!eventCandle || eventIndex < 1) return null;
+  const start = Math.max(1, eventIndex - 13);
+  const ranges: number[] = [];
+  for (let index = start; index <= eventIndex; index += 1) {
+    const candle = candles[index];
+    const previousClose = candles[index - 1].close;
+    ranges.push(Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previousClose),
+      Math.abs(candle.low - previousClose)
+    ));
+  }
+  const atr = ranges.length ? ranges.reduce((sum, value) => sum + value, 0) / ranges.length : 0;
+  const eventRange = eventCandle.high - eventCandle.low;
+  return atr > 0 ? eventRange / atr : null;
 }
 
 function parseList(value: string): string[] {

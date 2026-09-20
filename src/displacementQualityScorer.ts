@@ -73,7 +73,8 @@ export function scoreDisplacementQuality(
   } else {
     // Check for raw imbalance
     let hasRawImbalance = false;
-    for (let i = leg.startIndex; i <= leg.endIndex; i++) {
+    const safeEndIndex = Math.min(leg.endIndex - 1, candles.length - 2);
+    for (let i = leg.startIndex; i <= safeEndIndex; i++) {
       if (i - 1 >= 0 && i + 1 < candles.length) {
         if (leg.direction === 'bullish') {
           if (candles[i + 1].low > candles[i - 1].high) {
@@ -116,7 +117,8 @@ export function scoreDisplacementQuality(
   let sizeScore = 0;
   if (priorAvgRange > 0) {
     const ratio = legAvgRange / priorAvgRange;
-    if (ratio >= 1.5) {
+    const thresholdEpsilon = 1e-9;
+    if (ratio + thresholdEpsilon >= 1.5) {
       sizeScore = 1;
     } else if (ratio >= 1.0) {
       sizeScore = 0.5;
@@ -126,6 +128,7 @@ export function scoreDisplacementQuality(
   // ----------------------------------------------------
   // Total Score and Quality Grading
   // ----------------------------------------------------
+  const sizeRatio = priorAvgRange > 0 ? legAvgRange / priorAvgRange : null;
   const totalScore = bodyRatioScore + consecutiveScore + fvgScore + sizeScore;
 
   let quality: 'güçlü' | 'orta' | 'zayıf' | 'yok';
@@ -154,5 +157,12 @@ export function scoreDisplacementQuality(
     totalScore,
     quality,
     gradePoints,
+    avgBodyRatio,
+    consecutiveCount,
+    fvgCount: fvgs.length,
+    rawImbalanceDetected: fvgs.length === 0 && fvgScore > 0,
+    legAvgRange,
+    priorAvgRange,
+    sizeRatio,
   };
 }

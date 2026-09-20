@@ -21,6 +21,7 @@ export function generateBenchmark(dataset: ValidatedLabeledDataset): BenchmarkRe
   const snapshotVersion = first?.snapshot.snapshotVersion ?? 1;
   const outcomeVersion = first?.outcome.outcomeVersion ?? 1;
   const labelingConfigVersion = first?.outcome.metadata.labelingConfigVersion ?? 1;
+  const sourceCoverageRate = dataset.sourceCoverageRate ?? dataset.coverage.coverageRate;
 
   return {
     metadata: {
@@ -28,7 +29,7 @@ export function generateBenchmark(dataset: ValidatedLabeledDataset): BenchmarkRe
       snapshotVersion,
       outcomeVersion,
       labelingConfigVersion,
-      generatedAtDatasetCoverage: dataset.coverage.coverageRate,
+      generatedAtDatasetCoverage: sourceCoverageRate,
       datasetFingerprint: calculateDatasetFingerprint(dataset),
     },
     coverage: {

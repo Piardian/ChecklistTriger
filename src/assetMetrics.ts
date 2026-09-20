@@ -183,6 +183,8 @@ export function calculateDistance(
   });
 }
 
+import { SMC_ADMISSION_RULES } from './smcAdmissionRulebook';
+
 export interface MinimumBoxSizeSpec {
   readonly minUnits: number;
   readonly minPercent?: number;
@@ -191,39 +193,41 @@ export interface MinimumBoxSizeSpec {
 export function getMinimumBoxSize(symbol: string): MinimumBoxSizeSpec {
   const assetClass = detectAssetClass(symbol);
   const upper = symbol.toUpperCase();
+  const rules = SMC_ADMISSION_RULES.box;
 
   if (assetClass === 'FOREX') {
-    // Volatile crosses or wide-spread pairs require at least 5.0 pips
-    const isVolatileCross = upper.includes('CHF') || upper.includes('CAD');
-    return Object.freeze({ minUnits: isVolatileCross ? 5.0 : 2.8 });
+    const isVolatileCross = rules.FOREX.volatileCrossSymbols.some(token => upper.includes(token));
+    return Object.freeze({
+      minUnits: isVolatileCross ? rules.FOREX.volatileCrossMinUnits : rules.FOREX.defaultMinUnits,
+    });
   }
 
   if (assetClass === 'FOREX_JPY') {
-    // JPY crosses (GBPJPY, CHFJPY, EURJPY) require at least 5.0 pips (0.05 on price)
-    const isCross = upper.startsWith('GBP') || upper.startsWith('CHF') || upper.startsWith('EUR');
-    return Object.freeze({ minUnits: isCross ? 5.0 : 4.0 });
+    const isCross = rules.FOREX_JPY.crossPrefixes.some(prefix => upper.startsWith(prefix));
+    return Object.freeze({
+      minUnits: isCross ? rules.FOREX_JPY.crossMinUnits : rules.FOREX_JPY.defaultMinUnits,
+    });
   }
 
   if (assetClass === 'COMMODITY') {
     if (upper.startsWith('XAU')) {
-      return Object.freeze({ minUnits: 25.0 }); // $2.50 USD (25 pips @ 0.1 pip size)
+      return Object.freeze({ minUnits: rules.COMMODITY.xauMinUnits });
     }
-    return Object.freeze({ minUnits: 15.0 });
+    return Object.freeze({ minUnits: rules.COMMODITY.defaultMinUnits });
   }
 
   if (assetClass === 'CRYPTO') {
     if (upper.startsWith('BTC')) {
-      return Object.freeze({ minUnits: 50.0, minPercent: 0.06 });
+      return Object.freeze({ minUnits: rules.CRYPTO.btcMinUnits, minPercent: rules.CRYPTO.btcMinPercent });
     }
-    // Altcoins (ETH, SOL, LTC) require at least 0.25% box height
-    return Object.freeze({ minUnits: 0, minPercent: 0.25 });
+    return Object.freeze({ minUnits: 0, minPercent: rules.CRYPTO.altcoinMinPercent });
   }
 
   if (assetClass === 'INDEX') {
-    return Object.freeze({ minUnits: 2.0, minPercent: 0.15 });
+    return Object.freeze({ minUnits: rules.INDEX.minUnits, minPercent: rules.INDEX.minPercent });
   }
 
-  return Object.freeze({ minUnits: 3.0 });
+  return Object.freeze({ minUnits: rules.fallbackMinUnits });
 }
 
 export function isBoxTooNarrow(
@@ -254,7 +258,7 @@ export function isBoxTooNarrow(
 
   // 3. Dynamic ATR check if ATR is provided (must be at least 25% of 15M ATR)
   if (atrPips !== undefined && atrPips !== null && atrPips > 0) {
-    if (zoneWidthUnits < 0.25 * atrPips) {
+    if (zoneWidthUnits < SMC_ADMISSION_RULES.box.dynamicAtrFraction * atrPips) {
       return true;
     }
   }

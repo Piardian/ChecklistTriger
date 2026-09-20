@@ -1,19 +1,17 @@
 import { Candle, SwingPoint, PremiumDiscountState } from './types';
 
+export const PREMIUM_DISCOUNT_THRESHOLD = 0.5 as const;
+
 /**
- * Calculates Premium/Discount (Fib) status based on the latest confirmed swing high and swing low.
- * 
- * Rules:
- * 1. Filter swings confirmed up to currentIndex (confirmedAtIndex <= currentIndex).
- * 2. rangeHigh is the price of the latest confirmed swing high.
- * 3. rangeLow is the price of the latest confirmed swing low.
- * 4. Edge cases:
- *    - If there isn't at least 1 confirmed swing high AND 1 confirmed swing low -> status: 'undefined', other fields null.
- *    - If rangeHigh === rangeLow -> status: 'undefined', other fields null (prevents zero division).
- * 5. Classifications:
- *    - fibValue > 0.55 -> 'premium'
- *    - fibValue < 0.45 -> 'discount'
- *    - 0.45 <= fibValue <= 0.55 -> 'eq'
+ * Calculates Premium/Discount (Fib) status from the latest confirmed dealing range.
+ *
+ * The range is defined by the latest confirmed adjacent high/low swing pair,
+ * rather than independently selecting the latest high and latest low from
+ * different structural legs. This avoids accidentally combining unrelated
+ * swing points into one dealing range.
+ *
+ * Premium/discount split: > 0.50 is premium, < 0.50 is discount, exactly
+ * 0.50 is equilibrium. Keep this threshold versioned with the analysis rulebook.
  */
 export function calculatePremiumDiscount(
   candles: Candle[],
@@ -24,13 +22,17 @@ export function calculatePremiumDiscount(
     return { status: 'undefined', fibValue: null, rangeHigh: null, rangeLow: null };
   }
 
-  // Filter confirmed swings up to currentIndex
-  const confirmedSwings = swings.filter(s => s.confirmedAtIndex <= currentIndex);
-  const confirmedHighs = confirmedSwings.filter(s => s.type === 'high');
-  const confirmedLows = confirmedSwings.filter(s => s.type === 'low');
+  const confirmedSwings = swings
+    .filter(s => s.confirmedAtIndex <= currentIndex)
+    .slice()
+    .sort((a, b) => {
+      if (a.confirmedAtIndex !== b.confirmedAtIndex) {
+        return a.confirmedAtIndex - b.confirmedAtIndex;
+      }
+      return a.formedAtIndex - b.formedAtIndex;
+    });
 
-  // Verify we have at least one of each
-  if (confirmedHighs.length === 0 || confirmedLows.length === 0) {
+  if (confirmedSwings.length < 2) {
     return {
       status: 'undefined',
       fibValue: null,
@@ -39,14 +41,33 @@ export function calculatePremiumDiscount(
     };
   }
 
-  // Get the latest confirmed swing high and low
-  const latestHigh = confirmedHighs[confirmedHighs.length - 1];
-  const latestLow = confirmedLows[confirmedLows.length - 1];
+  // Find the most recent adjacent pair made of opposite swing types.
+  // Two consecutive highs (or lows) do not define a dealing range by themselves.
+  let rangeHighSwing: SwingPoint | null = null;
+  let rangeLowSwing: SwingPoint | null = null;
 
-  const rangeHigh = Math.max(latestHigh.price, latestLow.price);
-  const rangeLow = Math.min(latestHigh.price, latestLow.price);
+  for (let i = confirmedSwings.length - 1; i > 0; i -= 1) {
+    const newer = confirmedSwings[i];
+    const older = confirmedSwings[i - 1];
+    if (newer.type === older.type) continue;
 
-  // Zero-division guard
+    rangeHighSwing = newer.type === 'high' ? newer : older;
+    rangeLowSwing = newer.type === 'low' ? newer : older;
+    break;
+  }
+
+  if (!rangeHighSwing || !rangeLowSwing) {
+    return {
+      status: 'undefined',
+      fibValue: null,
+      rangeHigh: null,
+      rangeLow: null,
+    };
+  }
+
+  const rangeHigh = Math.max(rangeHighSwing.price, rangeLowSwing.price);
+  const rangeLow = Math.min(rangeHighSwing.price, rangeLowSwing.price);
+
   if (rangeHigh === rangeLow) {
     return {
       status: 'undefined',
@@ -60,9 +81,9 @@ export function calculatePremiumDiscount(
   const fibValue = (currentPrice - rangeLow) / (rangeHigh - rangeLow);
 
   let status: 'premium' | 'discount' | 'eq';
-  if (fibValue > 0.55) {
+  if (fibValue > PREMIUM_DISCOUNT_THRESHOLD) {
     status = 'premium';
-  } else if (fibValue < 0.45) {
+  } else if (fibValue < PREMIUM_DISCOUNT_THRESHOLD) {
     status = 'discount';
   } else {
     status = 'eq';

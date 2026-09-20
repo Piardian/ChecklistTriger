@@ -7,7 +7,7 @@ import { validateDataset } from '../src/outcomeValidation';
 import { outcome, snapshot } from './outcomeValidation.test';
 
 describe('Decision Engine', () => {
-  test('evaluates learning patterns through immutable policy and produces explainable eligible decisions', () => {
+  test('fails closed when a risk limit is configured without validated risk classification', () => {
     const learningReport = createLearningReport();
     const policy = createDecisionPolicy({
       policyId: 'policy-v1',
@@ -22,34 +22,27 @@ describe('Decision Engine', () => {
     });
 
     const report = generateDecisionReport(learningReport, policy);
-    const eligible = report.decisions.find(decision => decision.status === 'ELIGIBLE');
+    const blocked = report.decisions.find(decision => decision.status === 'NOT_ELIGIBLE');
 
     expect(Object.isFrozen(policy)).toBe(true);
     expect(report.metadata).toMatchObject({
       decisionReportVersion: 1,
       learningReportVersion: 1,
       datasetFingerprint: learningReport.metadata.datasetFingerprint,
+      source: 'HISTORICAL_LEARNING',
       generatedFromPolicyId: 'policy-v1',
       generatedFromPolicyVersion: 1,
     });
-    expect(eligible).toBeDefined();
-    expect(eligible?.explanation.policyReference).toEqual({ policyId: 'policy-v1', version: 1 });
-    expect(eligible?.explanation.patternReference).toMatchObject({
-      type: 'PERFORMANCE_ADVANTAGE',
-      metric: 'TPRate',
-      segment: 'grade',
-      value: 'A+',
-    });
-    expect(eligible?.observationId).toBeDefined();
-    expect(eligible?.explanation.benchmarkReference?.datasetFingerprint).toBe(learningReport.metadata.datasetFingerprint);
-    expect(eligible?.executionEligibility).toEqual({
+    expect(blocked).toBeDefined();
+    expect(blocked?.executionEligibility).toEqual({
       executable: false,
       reason: 'Execution Engine not implemented',
     });
-    expect(eligible?.policyResults.checks).toContainEqual(expect.objectContaining({
+    expect(blocked?.policyResults.checks).toContainEqual(expect.objectContaining({
       check: 'MAXIMUM_RISK_LEVEL',
-      status: 'SKIPPED',
-      severity: 'INFO',
+      status: 'FAIL',
+      severity: 'ERROR',
+      actual: 'UNCLASSIFIED',
     }));
   });
 

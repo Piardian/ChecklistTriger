@@ -16,16 +16,9 @@ export interface SignalValidationGateDecision {
   readonly waitReason: string | null;
 }
 
-const ENTRY_MAX_DISTANCE_PIPS = 25;
-const CONFIRMATION_MAX_DISTANCE_PIPS = 15;
 const ZONE_INVALIDATION_TOLERANCE_PIPS = 1;
 const DEFAULT_MAX_MARKET_DATA_AGE_MS = 30 * 60 * 1000;
 const MAX_FUTURE_MARKET_DATA_SKEW_MS = 16 * 60 * 1000;
-const MAX_POI_AGE_MS: Readonly<Record<'15m' | '1h' | '4h', number>> = Object.freeze({
-  '15m': 3 * 24 * 60 * 60 * 1000,
-  '1h': 14 * 24 * 60 * 60 * 1000,
-  '4h': 30 * 24 * 60 * 60 * 1000,
-});
 
 export function evaluateSignalValidationGate(
   candidate: NotificationCandidate,
@@ -188,13 +181,6 @@ function resolveZone(candidate: NotificationCandidate): { low: number; high: num
   }
   const fvg = candidate.poi as { gapLow: number; gapHigh: number };
   return { low: fvg.gapLow, high: fvg.gapHigh };
-}
-
-function distanceToZonePips(candidate: NotificationCandidate, low: number, high: number): number {
-  const size = pipSize(candidate.symbol);
-  if (candidate.currentPrice >= low && candidate.currentPrice <= high) return 0;
-  if (candidate.currentPrice > high) return (candidate.currentPrice - high) / size;
-  return (low - candidate.currentPrice) / size;
 }
 
 function pipSize(symbol: string): number {

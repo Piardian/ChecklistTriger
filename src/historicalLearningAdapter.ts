@@ -1,0 +1,186 @@
+import * as fs from 'fs';
+import * as path from 'path';
+import { CompletedSignalOutcomeEvidence, SignalEvidenceRecord } from './signalEvidence';
+import { GRADE_ENGINE_VERSION, SIGNAL_INTELLIGENCE_SNAPSHOT_VERSION, SignalIntelligenceSnapshot } from './signalIntelligenceSnapshot';
+import { GradeResult } from './gradeCalculator';
+import { SIGNAL_QUALITY_RESULT_VERSION } from './signalQualityEngine';
+import { OutcomeResult, OUTCOME_LABELING_CONFIG_VERSION, OUTCOME_RESULT_VERSION } from './outcomeResult';
+import { ValidatedLabeledDataset, createValidatedDataset } from './validatedDataset';
+import { DatasetCoverage, createValidationReport, ValidationReport } from './validationReport';
+import { ALL_SYMBOLS, Symbol } from '../server/universe';
+
+const SUPPORTED_SYMBOLS: readonly string[] = [...ALL_SYMBOLS, 'BTCEUR', 'ETHEUR', 'LTCEUR'];
+const BAR_DURATION_MS = 15 * 60 * 1000;
+
+export interface HistoricalLearningAdapterOptions { signalsFile?: string; outcomesFile?: string; }
+export interface HistoricalLearningReadError { file: 'signals' | 'outcomes'; line: number; message: string; }
+export interface HistoricalLearningAdapterResult {
+  dataset: ValidatedLabeledDataset;
+  validationReport: ValidationReport;
+  readErrors: readonly HistoricalLearningReadError[];
+  skippedSignalCount: number;
+  skippedOutcomeCount: number;
+}
+
+export function buildHistoricalLearningDataset(options: HistoricalLearningAdapterOptions = {}): HistoricalLearningAdapterResult {
+  const signalsFile = path.resolve(options.signalsFile ?? process.env.SIGNAL_EVIDENCE_FILE ?? 'evidence/signals/signal-evidence.jsonl');
+  const outcomesFile = path.resolve(options.outcomesFile ?? process.env.OUTCOME_EVIDENCE_FILE ?? 'evidence/outcomes/outcome-evidence.jsonl');
+  const signalRead = readJsonl<SignalEvidenceRecord>(signalsFile, 'signals');
+  const outcomeRead = readJsonl<CompletedSignalOutcomeEvidence>(outcomesFile, 'outcomes');
+  const readErrors = [...signalRead.errors, ...outcomeRead.errors];
+  const signalsById = new Map<string, SignalIntelligenceSnapshot>();
+  let skippedSignalCount = 0;
+
+  for (const signal of signalRead.records) {
+    const snapshot = toSnapshot(signal);
+    if (!snapshot) { skippedSignalCount += 1; continue; }
+    if (signalsById.has(snapshot.candidateId)) {
+      readErrors.push({ file: 'signals', line: 0, message: `Duplicate signalId ${snapshot.candidateId} found.` });
+      continue;
+    }
+    signalsById.set(snapshot.candidateId, snapshot);
+  }
+
+  const outcomesById = new Map<string, OutcomeResult>();
+  let skippedOutcomeCount = 0;
+  for (const evidence of outcomeRead.records) {
+    const outcome = toOutcomeResult(evidence, signalsById.get(evidence.signalId));
+    if (!outcome) { skippedOutcomeCount += 1; continue; }
+    if (outcomesById.has(outcome.candidateId)) {
+      readErrors.push({ file: 'outcomes', line: 0, message: `Duplicate outcome for signalId ${outcome.candidateId} found.` });
+      continue;
+    }
+    outcomesById.set(outcome.candidateId, outcome);
+  }
+
+  const snapshots = [...signalsById.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const outcomes = [...outcomesById.values()].sort((a, b) => a.labeledAt.localeCompare(b.labeledAt));
+  const labeledCount = snapshots.filter(snapshot => outcomesById.has(snapshot.candidateId)).length;
+  const coverage = createCoverage(snapshots.length, labeledCount);
+  const validationReport = createValidationReport(
+    readErrors.map(error => ({ severity: 'error' as const, code: 'READ_ERROR', message: `${error.file}:${error.line}: ${error.message}` })),
+    coverage
+  );
+  const dataset = createValidatedDataset({ snapshots, outcomes, validationReport });
+  return Object.freeze({ dataset, validationReport, readErrors: Object.freeze(readErrors), skippedSignalCount, skippedOutcomeCount });
+}
+
+function toSnapshot(record: SignalEvidenceRecord): SignalIntelligenceSnapshot | null {
+  if (![1, 2].includes(record.evidenceSchemaVersion) || !record.signalQuality) return null;
+  if (!SUPPORTED_SYMBOLS.includes(record.metadata.symbol)) return null;
+  if (!['long', 'short'].includes(record.metadata.direction)) return null;
+  if (!['OB', 'FVG'].includes(record.poi.poiType)) return null;
+  if (!['BOS', 'CHoCH'].includes(record.structure.eventType)) return null;
+
+  const grade: GradeResult = {
+    totalScore: record.grade.totalScore,
+    grade: record.grade.grade,
+    entryAllowed: record.grade.entryAllowed,
+    breakdown: record.grade.breakdown,
+    blockReasons: [...record.grade.blockReasons],
+  };
+
+  return {
+    snapshotVersion: SIGNAL_INTELLIGENCE_SNAPSHOT_VERSION,
+    timestamp: new Date(record.metadata.timestamp).toISOString(),
+    symbol: record.metadata.symbol as Symbol,
+    timeframe: '15m',
+    candidateId: record.metadata.signalId,
+    candidate: {
+      poiType: record.poi.poiType,
+      tradeDirection: record.metadata.direction,
+      currentPrice: null,
+      poiFormedTimestamp: Math.max(0, record.metadata.timestamp - record.poi.poiAgeMs),
+      relatedEventType: record.structure.eventType,
+      relatedEventTimestamp: record.structure.eventTimestamp,
+    },
+    signalQuality: record.signalQuality,
+    grade,
+    engine: { signalQualityVersion: SIGNAL_QUALITY_RESULT_VERSION, gradeVersion: GRADE_ENGINE_VERSION },
+  };
+}
+
+function toOutcomeResult(evidence: CompletedSignalOutcomeEvidence, snapshot: SignalIntelligenceSnapshot | undefined): OutcomeResult | null {
+  if (!snapshot || ![1, 2].includes(evidence.evidenceSchemaVersion) || !Number.isFinite(evidence.outcome.exitTimestamp)) return null;
+  // MANUAL and CANCELLED are real lifecycle outcomes, but the benchmark's label space
+  // has no equivalent. Exclude them instead of mislabelling them as insufficient data.
+  if (evidence.outcome.type === 'MANUAL' || evidence.outcome.type === 'CANCELLED') return null;
+
+  const evaluation = evidence.evaluation;
+  if (evaluation && ![1, 2].includes(evaluation.version)) return null;
+
+  const fallbackStartTimestamp = new Date(snapshot.timestamp).getTime();
+  const startTimestamp = evaluation?.evaluationStartTimestamp ?? fallbackStartTimestamp;
+  const endTimestamp = evaluation?.evaluationEndTimestamp ?? evidence.outcome.exitTimestamp;
+  if (!Number.isFinite(startTimestamp) || !Number.isFinite(endTimestamp) || endTimestamp < startTimestamp) return null;
+
+  const fallbackDurationMs = evidence.outcome.holdingTimeMs ?? Math.max(0, endTimestamp - startTimestamp);
+  const fallbackDurationBars = Math.max(0, Math.round(fallbackDurationMs / BAR_DURATION_MS));
+  const evaluatedCandles = evaluation?.evaluatedCandles ?? fallbackDurationBars;
+  if (!Number.isFinite(evaluatedCandles) || evaluatedCandles < 0) return null;
+
+  const entryTriggeredAt = evaluation?.entryTriggeredAt ?? null;
+  const evaluationDurationBars = entryTriggeredAt === null
+    ? evaluatedCandles
+    : Math.max(0, Math.round((endTimestamp - entryTriggeredAt) / BAR_DURATION_MS));
+
+  const status: OutcomeResult['outcomeStatus'] = ['TP', 'SL', 'BE', 'EXPIRED', 'UNKNOWN'].includes(evidence.outcome.type)
+    ? evidence.outcome.type as OutcomeResult['outcomeStatus']
+    : 'UNKNOWN';
+  return {
+    outcomeVersion: OUTCOME_RESULT_VERSION,
+    candidateId: evidence.signalId,
+    labeledAt: evidence.appendedAt,
+    outcomeStatus: status,
+    completionReason: completionReasonFor(status),
+    reason: { reasonCode: reasonCodeFor(status), reasonMessage: evidence.outcome.exitReason },
+    metadata: {
+      labelingConfigVersion: OUTCOME_LABELING_CONFIG_VERSION,
+      evaluatedCandles,
+      startTimestamp,
+      endTimestamp,
+      resolvedAtTimestamp: endTimestamp,
+      resolvedAtIndex: evaluation?.entryTriggeredAt === null ? null : evaluationDurationBars,
+      maxFavorableExcursionPips: evidence.outcome.maximumFavorableExcursion ?? 0,
+      maxAdverseExcursionPips: evidence.outcome.maximumAdverseExcursion ?? 0,
+      evaluationDurationBars,
+      evaluationCompleted: true,
+    },
+  };
+}
+
+function reasonCodeFor(status: OutcomeResult['outcomeStatus']): OutcomeResult['reason']['reasonCode'] {
+  switch (status) {
+    case 'TP': return 'TAKE_PROFIT_LEVEL_REACHED';
+    case 'SL': return 'STOP_LOSS_LEVEL_REACHED';
+    case 'BE': return 'BREAK_EVEN_LEVEL_REACHED';
+    case 'EXPIRED': return 'EXPIRED_WITHOUT_RESOLUTION';
+    case 'UNKNOWN': return 'INSUFFICIENT_FUTURE_DATA';
+  }
+}
+
+function completionReasonFor(status: OutcomeResult['outcomeStatus']): OutcomeResult['completionReason'] {
+  switch (status) {
+    case 'TP': return 'take_profit_hit';
+    case 'SL': return 'stop_loss_hit';
+    case 'BE': return 'break_even_reached';
+    case 'EXPIRED': return 'expired_without_resolution';
+    case 'UNKNOWN': return 'insufficient_future_data';
+  }
+}
+
+function createCoverage(snapshotCount: number, labeledCount: number): DatasetCoverage {
+  return { snapshotCount, labeledCount, missingOutcomeCount: Math.max(0, snapshotCount - labeledCount), coverageRate: snapshotCount === 0 ? 0 : labeledCount / snapshotCount };
+}
+
+function readJsonl<T>(filePath: string, file: 'signals' | 'outcomes'): { records: T[]; errors: HistoricalLearningReadError[] } {
+  if (!fs.existsSync(filePath)) return { records: [], errors: [] };
+  const records: T[] = [];
+  const errors: HistoricalLearningReadError[] = [];
+  fs.readFileSync(filePath, 'utf8').split(/\r?\n/).forEach((line, index) => {
+    const trimmed = line.trim(); if (!trimmed) return;
+    try { records.push(JSON.parse(trimmed) as T); }
+    catch (error) { errors.push({ file, line: index + 1, message: error instanceof Error ? error.message : String(error) }); }
+  });
+  return { records, errors };
+}

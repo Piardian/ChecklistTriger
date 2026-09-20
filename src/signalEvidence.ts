@@ -10,11 +10,16 @@ import { OverlaySimplificationResult } from '../server/overlaySimplifier';
 import type { CommunicationDecisionLog, CommunicationMessage, CommunicationMessageQualityValidation } from './communicationModel';
 import type { OperationalErrorSummary, OperationalHealthSnapshot, OperationalRetrySummary, PipelineTimelineEntry } from '../server/telemetry';
 import type { GovernanceEvidenceSummary } from './governanceFramework';
+import type { SignalQualityResult } from './signalQualityEngine';
 
-export const SIGNAL_EVIDENCE_SCHEMA_VERSION = 1 as const;
+export const SIGNAL_EVIDENCE_SCHEMA_VERSION = 2 as const;
+export const SIGNAL_EVIDENCE_STRATEGY_VERSION = 'SWING_BOS_CORE_V1' as const;
 export const SIGNAL_EVIDENCE_ENGINE_VERSION = 1 as const;
 export const SIGNAL_EVIDENCE_DETECTOR_VERSION = 1 as const;
 export const SIGNAL_EVIDENCE_GRADE_VERSION = 1 as const;
+export const SIGNAL_OUTCOME_ENGINE_VERSION = 1 as const;
+
+export type SignalEvidenceSchemaVersion = 1 | 2;
 
 export type SignalEvidenceDirection = 'long' | 'short';
 import type { Symbol } from '../server/universe';
@@ -31,14 +36,8 @@ export interface SmartScreenshotPlanEvidence {
   readonly focusIndex: number;
   readonly anchorIndices: readonly number[];
   readonly visibleBars: number;
-  readonly visibleRange: {
-    readonly from: number;
-    readonly to: number;
-  };
-  readonly padding: {
-    readonly leftBars: number;
-    readonly rightBars: number;
-  };
+  readonly visibleRange: { readonly from: number; readonly to: number };
+  readonly padding: { readonly leftBars: number; readonly rightBars: number };
   readonly reasons: readonly string[];
   readonly warnings: readonly string[];
 }
@@ -80,8 +79,38 @@ export interface SignalTrendSnapshotEvidence {
   readonly monthlyCoverage: number;
 }
 
+export interface SignalMarketContextEvidence {
+  readonly session: 'ASIA' | 'LONDON' | 'NEW_YORK' | 'LONDON_NY_OVERLAP' | 'OFF_HOURS' | string;
+  readonly killzone: {
+    readonly active: boolean;
+    readonly reason: string;
+  };
+  readonly dayOfWeek: number;
+  readonly dayOfWeekName: string;
+  readonly hourUtc: number;
+  readonly hourLocal?: number;
+  readonly timezone?: string;
+  readonly volatilityAtr: number | null;
+  readonly marketWindowState: {
+    readonly active: boolean;
+    readonly reason: string;
+  };
+  readonly marketRegime: string | null;
+}
+
+export interface SignalClassificationEvidence {
+  readonly strategy: string;
+  readonly setupType: string;
+  readonly poiType: SignalEvidencePoiType;
+  readonly structureEvent: SignalEvidenceStructureType;
+  readonly grade: GradeResult['grade'];
+  readonly score: number;
+  readonly entryAllowed: boolean;
+  readonly rulebookVersion?: string;
+}
+
 export interface SignalEvidenceRecord {
-  readonly evidenceSchemaVersion: typeof SIGNAL_EVIDENCE_SCHEMA_VERSION;
+  readonly evidenceSchemaVersion: SignalEvidenceSchemaVersion;
   readonly metadata: {
     readonly signalId: string;
     readonly timestamp: number;
@@ -89,36 +118,47 @@ export interface SignalEvidenceRecord {
     readonly symbol: SignalEvidenceSymbol;
     readonly direction: SignalEvidenceDirection;
     readonly timeframe: SignalEvidenceTimeframe;
+    readonly strategyVersion?: string;
     readonly engineVersion: typeof SIGNAL_EVIDENCE_ENGINE_VERSION;
     readonly detectorVersion: typeof SIGNAL_EVIDENCE_DETECTOR_VERSION;
     readonly gradeVersion: typeof SIGNAL_EVIDENCE_GRADE_VERSION;
+    readonly evidenceSchemaVersion?: SignalEvidenceSchemaVersion;
   };
+  readonly classification?: SignalClassificationEvidence;
   readonly htfContext: {
     readonly bias4H: string;
     readonly bias1H: string;
     readonly pd4H: string;
     readonly pd1H: string;
     readonly pd15M: string | null;
+    readonly bias15M?: string | null;
+    readonly htfAlignmentState?: 'FULL_ALIGNMENT' | 'PARTIAL_ALIGNMENT' | 'CONFLICT' | 'NEUTRAL' | string;
   };
   readonly structure: {
     readonly eventType: SignalEvidenceStructureType;
     readonly eventTimestamp: number;
     readonly eventTimeframe: SignalEvidenceTimeframe;
     readonly structureScore: number;
+    readonly swingContext?: Record<string, unknown> | null;
   };
   readonly poi: {
     readonly poiType: SignalEvidencePoiType;
     readonly timeframe: SignalEvidenceTimeframe;
     readonly zoneHigh: number;
     readonly zoneLow: number;
+    readonly midpoint?: number;
     readonly poiAgeMs: number;
+    readonly poiAgeBars?: number;
     readonly poiTestCount: number;
+    readonly distanceFromCurrentPrice?: number;
+    readonly mitigationState?: 'UNMITIGATED' | 'PARTIALLY_MITIGATED' | 'MITIGATED' | null;
   };
   readonly displacement: {
     readonly displacementScore: number;
     readonly bodyPercentage: number | null;
     readonly range: number | null;
     readonly impulseDirection: 'bullish' | 'bearish';
+    readonly atrNormalizedDisplacement?: number | null;
   };
   readonly sweep: {
     readonly sweepDetected: boolean;
@@ -127,6 +167,7 @@ export interface SignalEvidenceRecord {
   };
   readonly model: {
     readonly modelState: 'confirmed' | 'weak' | 'missing';
+    readonly modelType?: 'model1_reversal' | 'model2_continuation' | 'none';
     readonly admissionProfile: string;
   };
   readonly grade: {
@@ -136,6 +177,8 @@ export interface SignalEvidenceRecord {
     readonly breakdown: GradeResult['breakdown'];
     readonly blockReasons: readonly string[];
   };
+  readonly signalQuality?: SignalQualityResult;
+  readonly marketContext?: SignalMarketContextEvidence;
   readonly setupAssessmentShadow?: {
     readonly version: SetupAssessment['version'];
     readonly grade: SetupAssessment['grade'];
@@ -187,42 +230,126 @@ export interface SignalEvidenceRecord {
       readonly executionAllowed: boolean;
       readonly reasonCode: string | null;
       readonly reasonMessage: string | null;
+      readonly theoreticalRiskDistance?: number;
+      readonly invalidationPrice?: number;
     };
   };
 }
 
+export interface CompletedSignalOutcomeEvaluationEvidence {
+  readonly version: 1 | 2;
+  readonly outcomeEngineVersion?: number;
+  readonly entryPrice: number;
+  readonly stopPrice: number;
+  readonly targetPrice: number;
+  readonly riskDistance: number;
+  readonly targetRMultiple?: number;
+  readonly entryMode?: 'midpoint' | 'zone_touch';
+  readonly entryWindowBars: number;
+  readonly maxHoldBars: number;
+  readonly sameCandleResolution: 'STOP_LOSS_FIRST';
+  readonly sameCandleConflict?: boolean;
+  readonly entryTriggeredAt: number | null;
+  readonly evaluatedCandles: number;
+  readonly evaluationStartTimestamp: number;
+  readonly evaluationEndTimestamp: number | null;
+  readonly holdingBars?: number | null;
+  readonly calendarDurationMs?: number | null;
+}
+
 export interface CompletedSignalOutcomeEvidence {
-  readonly evidenceSchemaVersion: typeof SIGNAL_EVIDENCE_SCHEMA_VERSION;
+  readonly evidenceSchemaVersion: SignalEvidenceSchemaVersion;
+  readonly outcomeEngineVersion?: number;
   readonly signalId: string;
   readonly appendedAt: string;
   readonly outcome: {
     readonly type: SignalEvidenceOutcomeType;
     readonly holdingTimeMs: number | null;
+    readonly holdingBars?: number | null;
     readonly rrAchieved: number | null;
     readonly maximumFavorableExcursion: number | null;
     readonly maximumAdverseExcursion: number | null;
     readonly exitTimestamp: number;
+    readonly exitPrice?: number | null;
     readonly exitReason: string;
   };
+  readonly entry?: {
+    readonly triggered: boolean;
+    readonly timestamp: number | null;
+    readonly price: number | null;
+    readonly entryMode: 'midpoint' | 'zone_touch';
+  };
+  readonly risk?: {
+    readonly stop: number;
+    readonly target: number;
+    readonly riskDistance: number;
+    readonly targetR: number;
+  };
+  readonly evaluation?: CompletedSignalOutcomeEvaluationEvidence;
+}
+
+export interface EvaluatedCandlePathPoint {
+  readonly timestamp: number;
+  readonly open: number;
+  readonly high: number;
+  readonly low: number;
+  readonly close: number;
+  readonly barsSinceObservation: number;
+  readonly barsSinceEntry: number | null;
+  readonly distanceToEntry: number;
+  readonly distanceToStop: number;
+  readonly distanceToTarget: number;
+  readonly mfe: number;
+  readonly mae: number;
+}
+
+export interface SignalPricePathEvidenceRecord {
+  readonly evidenceSchemaVersion: SignalEvidenceSchemaVersion;
+  readonly signalId: string;
+  readonly symbol: SignalEvidenceSymbol;
+  readonly recordedAt: string;
+  readonly points: readonly EvaluatedCandlePathPoint[];
 }
 
 export function createSignalEvidenceRecord(
-  input: Omit<SignalEvidenceRecord, 'evidenceSchemaVersion'>
+  input: Omit<SignalEvidenceRecord, 'evidenceSchemaVersion'> & { readonly evidenceSchemaVersion?: SignalEvidenceSchemaVersion }
 ): SignalEvidenceRecord {
   return deepFreeze({
-    evidenceSchemaVersion: SIGNAL_EVIDENCE_SCHEMA_VERSION,
+    evidenceSchemaVersion: input.evidenceSchemaVersion ?? SIGNAL_EVIDENCE_SCHEMA_VERSION,
     ...input,
   });
 }
 
 export function createCompletedSignalOutcomeEvidence(
-  input: Omit<CompletedSignalOutcomeEvidence, 'evidenceSchemaVersion' | 'appendedAt'> & { readonly appendedAt?: string }
+  input: Omit<CompletedSignalOutcomeEvidence, 'evidenceSchemaVersion' | 'appendedAt'> & {
+    readonly evidenceSchemaVersion?: SignalEvidenceSchemaVersion;
+    readonly appendedAt?: string;
+  }
 ): CompletedSignalOutcomeEvidence {
   return deepFreeze({
-    evidenceSchemaVersion: SIGNAL_EVIDENCE_SCHEMA_VERSION,
+    evidenceSchemaVersion: input.evidenceSchemaVersion ?? SIGNAL_EVIDENCE_SCHEMA_VERSION,
     appendedAt: input.appendedAt ?? new Date(input.outcome.exitTimestamp).toISOString(),
     signalId: input.signalId,
     outcome: input.outcome,
+    ...(input.entry ? { entry: input.entry } : {}),
+    ...(input.risk ? { risk: input.risk } : {}),
+    ...(input.evaluation ? { evaluation: input.evaluation } : {}),
+    ...(input.outcomeEngineVersion !== undefined ? { outcomeEngineVersion: input.outcomeEngineVersion } : {}),
+  });
+}
+
+export function createSignalPricePathEvidenceRecord(
+  input: Omit<SignalPricePathEvidenceRecord, 'evidenceSchemaVersion' | 'recordedAt'> & {
+    readonly evidenceSchemaVersion?: SignalEvidenceSchemaVersion;
+    readonly recordedAt?: string;
+  }
+): SignalPricePathEvidenceRecord {
+  return deepFreeze({
+    evidenceSchemaVersion: input.evidenceSchemaVersion ?? SIGNAL_EVIDENCE_SCHEMA_VERSION,
+    signalId: input.signalId,
+    symbol: input.symbol,
+    recordedAt: input.recordedAt ?? new Date().toISOString(),
+    points: input.points,
   });
 }
 

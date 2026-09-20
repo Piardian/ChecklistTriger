@@ -36,15 +36,27 @@ describe('Signal Evidence Recorder', () => {
       pd4H: 'discount',
       pd1H: 'discount',
       pd15M: 'discount',
+      bias15M: null,
+      htfAlignmentState: 'FULL_ALIGNMENT',
     });
     expect(evidence.structure).toEqual({
       eventType: 'BOS',
       eventTimestamp: 2000,
       eventTimeframe: '15m',
       structureScore: 2,
+      swingContext: {
+        brokenSwingPrice: 1.103,
+        brokenSwingType: 'high',
+        formedAtIndex: 0,
+        confirmedAtIndex: 1,
+        timestamp: 1000,
+      },
     });
+    expect(evidence.classification?.strategy).toBe('SWING_BOS_CORE');
+    expect(evidence.marketContext?.session).toBeDefined();
     expect(evidence.poi.zoneHigh).toBe(1.105);
     expect(evidence.poi.zoneLow).toBe(1.1);
+    expect(evidence.poi.midpoint).toBe(1.1025);
     expect(evidence.poi.poiAgeMs).toBe(1000);
     expect(evidence.displacement.bodyPercentage).toBe(50);
     expect(evidence.model.modelState).toBe('confirmed');
@@ -170,6 +182,25 @@ function candidate(): NotificationCandidate {
     pd1H: 'discount',
     pd15M: 'discount',
     admissionProfile: 'PRODUCTION',
+    modelState: {
+      model: 'model2_continuation',
+      regime: 'bullish',
+      triggeringSweep: null,
+      triggeringBOS: {
+        type: 'BOS',
+        direction: 'bullish',
+        brokenSwing: {
+          type: 'high',
+          price: 1.103,
+          formedAtIndex: 0,
+          confirmedAtIndex: 1,
+          timestamp: 1000,
+        },
+        breakCandleIndex: 1,
+        breakTimestamp: 2000,
+        breakClosePrice: 1.106,
+      },
+    },
   };
 }
 

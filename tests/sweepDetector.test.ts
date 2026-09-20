@@ -88,6 +88,34 @@ describe('Sweep Detector', () => {
     expect(events[1].sweptLevel).toBe(1.0300);
   });
 
+  test('should not consume a range boundary when penetration closes outside, allowing a later clean sweep', () => {
+    const candles = createBaseCandles(6);
+    const rangeStates: RangeState[] = Array.from({ length: 6 }, () => ({
+      isRange: true,
+      rangeHigh: 1.0600,
+      rangeLow: 1.0400,
+      regimeStartIndex: 0,
+    }));
+
+    // First breach exceeds the 5 pip threshold but closes outside the range.
+    candles[1].low = 1.0390;
+    candles[1].close = 1.0380;
+
+    // Later candle produces a clean wick sweep and closes back inside.
+    candles[3].low = 1.0390;
+    candles[3].close = 1.0450;
+
+    const events = detectSweeps(candles, rangeStates, 'EURUSD', '15m');
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'sweep_low',
+      candleIndex: 3,
+      closePrice: 1.0450,
+      closeRelation: 'inside_range',
+    });
+  });
+
   test('lookahead bias simulation test for sweeps', () => {
     const candles = createBaseCandles(10);
     const rangeStates: RangeState[] = [];
