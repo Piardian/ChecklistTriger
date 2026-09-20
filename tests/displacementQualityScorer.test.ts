@@ -66,25 +66,25 @@ describe('Displacement Quality Scorer', () => {
 
   test('Kriter 3 (FVG) - Scenario A: should score 1 if a valid threshold-passing FVG exists', () => {
     const candles = createBaseCandles(10);
-    // Setup candles centered on i=5 to have an 8-pip FVG
-    candles[4].high = 1.0502;
-    // displacement range is 20 pips, close-open body is 20 pips
-    candles[5] = { timestamp: 5000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 };
-    candles[6].low = 1.0510;
+    // Center the FVG on i=4: candle 5 is the structure-break candle,
+    // so no post-break candle is needed.
+    candles[3].high = 1.0502;
+    candles[4] = { timestamp: 4000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 };
+    candles[5].low = 1.0510;
 
-    const leg: DisplacementLeg = { startIndex: 5, endIndex: 5, direction: 'bullish' };
+    const leg: DisplacementLeg = { startIndex: 4, endIndex: 5, direction: 'bullish' };
     const score = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
     expect(score!.fvgScore).toBe(1);
   });
 
   test('Kriter 3 (FVG) - Scenario B: should score 0.5 if raw imbalance exists but fails threshold', () => {
     const candles = createBaseCandles(10);
-    // Center i=5. Setup a 3-pip raw gap (fails 5-pip threshold for EURUSD 15m)
-    candles[4].high = 1.0502;
-    candles[5] = { timestamp: 5000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 };
-    candles[6].low = 1.0505; // Gap = 3 pips
+    // Center the raw gap on i=4; candle 5 is the structure-break candle.
+    candles[3].high = 1.0502;
+    candles[4] = { timestamp: 4000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 };
+    candles[5].low = 1.0505; // Gap = 3 pips
 
-    const leg: DisplacementLeg = { startIndex: 5, endIndex: 5, direction: 'bullish' };
+    const leg: DisplacementLeg = { startIndex: 4, endIndex: 5, direction: 'bullish' };
     const score = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
     expect(score!.fvgScore).toBe(0.5);
   });
@@ -134,11 +134,11 @@ describe('Displacement Quality Scorer', () => {
     // prior average range is 10 pips. Leg candles set to 15 pips -> ratio 1.5 -> size = 1
     // body ratio average set to 80% -> body = 1
     // raw imbalance only (no threshold FVG) -> Fvg = 0.5
-    candles[4].high = 1.0502;
+    candles[4].high = 1.0507;
     for (let i = 5; i <= 7; i++) {
       candles[i] = { timestamp: i * 1000, open: 1.0492, high: 1.0507, low: 1.0492, close: 1.0505 };
     }
-    candles[8].low = 1.0509; // Raw imbalance gap = 1.0509 - 1.0507 = 2 pips (< 5 pips)
+    candles[7].low = 1.0509; // Valid raw gap centered on i=6: 2 pips (< 5 pips)
     
     let result = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
     expect(result!.totalScore).toBe(3.5);
@@ -175,6 +175,23 @@ describe('Displacement Quality Scorer', () => {
     expect(result!.totalScore).toBe(1.0);
     expect(result!.quality).toBe('yok');
     expect(result!.gradePoints).toBe(-2);
+  });
+
+  test('should not let a post-break candle create displacement imbalance evidence', () => {
+    const candles = createBaseCandles(10);
+    for (let i = 0; i < 5; i++) {
+      candles[i] = { timestamp: i * 1000, open: 1.0500, high: 1.0505, low: 1.0495, close: 1.0500 };
+    }
+
+    // Break occurs on index 5. Only index 0..5 is available at that decision point.
+    candles[5] = { timestamp: 5000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 };
+    candles[6].low = 1.0510; // Would create an FVG only if index 6 were illegally used.
+
+    const leg: DisplacementLeg = { startIndex: 5, endIndex: 5, direction: 'bullish' };
+    const result = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
+
+    expect(result!.fvgScore).toBe(0);
+    expect(result!.rawImbalanceDetected).toBe(false);
   });
 
   test('lookahead bias simulation for displacement quality scorer', () => {
