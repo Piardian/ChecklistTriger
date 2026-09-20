@@ -10,7 +10,7 @@ import type { SignalQualityResult } from '../src/signalQualityEngine';
 import type { SetupAssessment } from '../src/setupAssessment';
 
 export const RESEARCH_LEDGER_SCHEMA_VERSION = 1 as const;
-export type ResearchEvaluationStage = 'FILTER_REJECTED' | 'GRADED_REJECTED' | 'CANDIDATE';
+export type ResearchEvaluationStage = 'FILTER_REJECTED' | 'GRADED_REJECTED' | 'CONSOLIDATED_REJECTED' | 'CANDIDATE';
 
 export interface ResearchPoiEvaluation {
   readonly schemaVersion: typeof RESEARCH_LEDGER_SCHEMA_VERSION;
