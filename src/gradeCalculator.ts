@@ -277,7 +277,7 @@ export function calculateGrade(input: GradeInput): GradeResult {
   }
 
   const blockReasons: string[] = [];
-  if (input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= 15) {
+  if (input.opposingObstacle && input.opposingObstacle.hasObstacle && input.opposingObstacle.distancePips <= GRADE_RULES.caps.immediateObstacleDistancePips) {
     blockReasons.push(input.opposingObstacle.warningText);
   }
   if (input.bias4H !== expected4HBias) {
@@ -301,7 +301,7 @@ export function calculateGrade(input: GradeInput): GradeResult {
   if (input.displacementQuality15m === null || input.displacementQuality15m.gradePoints < 1) {
     blockReasons.push('15M displacement quality is insufficient');
   }
-  if (input.poiTestCount >= 2) {
+  if (input.poiTestCount >= GRADE_RULES.poi.overtestedAt) {
     blockReasons.push('POI is already tested multiple times; fresh POIs required for entry');
   }
   if (input.modelState.model === 'none') {
