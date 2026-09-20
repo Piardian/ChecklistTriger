@@ -9,6 +9,9 @@ export const PREMIUM_DISCOUNT_THRESHOLD = 0.5 as const;
  * rather than independently selecting the latest high and latest low from
  * different structural legs. This avoids accidentally combining unrelated
  * swing points into one dealing range.
+ *
+ * Premium/discount split: > 0.50 is premium, < 0.50 is discount, exactly
+ * 0.50 is equilibrium. Keep this threshold versioned with the analysis rulebook.
  */
 export function calculatePremiumDiscount(
   candles: Candle[],
