@@ -25,6 +25,8 @@ import { getPipSize, calculateDistance, detectAssetClass, isBoxTooNarrow } from 
 import { consolidateCandidates } from '../src/poiConsolidator';
 import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
+import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
+import { loadMacroContext } from './macroContext';
 
 export interface NotificationCandidate {
   symbol: Symbol;
@@ -201,10 +203,21 @@ export function runPipeline(
   const swings15m = detectSwings(candles15mCast);
   const structureState15m = detectStructure(candles15mCast, swings15m);
   maybeLogStructureDebug(candles15mCast, symbol);
-  const has15mEvent = structureState15m.events.length > 0;
   const lastIndex15m = candles15mCast.length - 1;
   const pd15M = calculatePremiumDiscount(candles15mCast, swings15m, lastIndex15m);
   const validationCandle = latestCompletedCandle(candles15mCast);
+
+  const obs = detectAllOrderBlocks(candles15mCast, structureState15m.events);
+  const fvgs = detectAllFVGs(candles15mCast, structureState15m.events, symbol, '15m');
+  const obs1H = detectAllOrderBlocks(candles1HCast, structureState1H.events);
+  const fvgs1H = detectAllFVGs(candles1HCast, structureState1H.events, symbol, '1h');
+  const rangeStates = candles15mCast.map((_, idx) =>
+    calculateRange(candles15mCast, swings15m, structureState15m, idx)
+  );
+  const sweeps = detectSweeps(candles15mCast, rangeStates, symbol, '15m');
+  const researchMacroContext = loadMacroContext(candles15mCast[lastIndex15m].timestamp);
+
+  const candidates: NotificationCandidate[] = [];
 
   const observePoiLifecycle = (
     poiType: 'OB' | 'FVG',
@@ -214,6 +227,7 @@ export function runPipeline(
     grade: string | null = null,
     candidateEligible = false,
     poiIntegrity?: GradeResult['poiIntegrity'],
+    gradeResult?: GradeResult,
   ): void => {
     const zone = poiType === 'OB'
       ? { low: (poi as OrderBlock).low, high: (poi as OrderBlock).high }
@@ -233,6 +247,44 @@ export function runPipeline(
     const poiTestCount = poiType === 'OB'
       ? countOBTests(candles15mCast, poi as OrderBlock, lastIndex15m).testCount
       : countFVGTests(candles15mCast, poi as FVG, lastIndex15m).testCount;
+    const structureEventIsValid = isStructureEventUsable(origin, lastIndex15m);
+    const displacement = scoreDisplacementQuality(
+      candles15mCast,
+      findDisplacementLeg(candles15mCast, origin),
+      symbol,
+      '15m'
+    );
+    const modelState = determineModel(structureState15m, sweeps, lastIndex15m, origin);
+    const liquidityMagnet = detectLiquidityMagnet(
+      swings15m,
+      currentPrice,
+      tradeDirection,
+      symbol,
+      candles15mCast,
+      lastIndex15m
+    );
+    const opposingObstacle = detectOpposingObstacle({
+      symbol,
+      tradeDirection,
+      entryZone: zone,
+      activeOrderBlocks15m: obs,
+      activeFVGs15m: fvgs,
+      activeOrderBlocks1h: obs1H,
+      activeFVGs1h: fvgs1H,
+      candles15m: candles15mCast,
+      candles1h: candles1HCast,
+      currentIndex15m: lastIndex15m,
+      currentIndex1h: lastIndex1H,
+    });
+    const signalQuality = maybeEvaluateSignalQuality({
+      poiType,
+      poi,
+      currentIndex: lastIndex15m,
+      currentPrice,
+      currentTimestamp: candles15mCast[lastIndex15m].timestamp,
+      poiTestCount,
+      symbol,
+    });
 
     recordPoiLifecycleTelemetry({
       type: 'poi_lifecycle',
@@ -259,13 +311,39 @@ export function runPipeline(
       isTouching: insideZone,
       isInvalidated,
     });
+
+    appendResearchPoiEvaluation(researchPoiInputBase({
+      symbol,
+      direction: tradeDirection,
+      poiType,
+      poi,
+      formedTimestamp,
+      observedAt: candles15mCast[lastIndex15m].timestamp,
+      pd4H,
+      pd1H,
+      pd15M,
+      bias4H,
+      bias1H,
+      bias15M: structureState15m.currentTrend,
+      distancePips,
+      distanceAtr: atrPips === null || atrPips === 0 ? null : distancePips / atrPips,
+      atrPips,
+      oppositeStructureEventsSinceOrigin,
+      poiTestCount,
+      displacement,
+      modelState: structureEventIsValid ? modelState : null,
+      triggeringSweep: structureEventIsValid ? (modelState.triggeringSweep ?? null) : null,
+      liquidityMagnet,
+      opposingObstacle,
+      grade: gradeResult ?? null,
+      signalQuality: signalQuality ?? null,
+      setupAssessmentV2: null,
+      macroContext: researchMacroContext,
+      blockingRules,
+      stage: candidateEligible ? 'CANDIDATE' : gradeResult ? 'GRADED_REJECTED' : 'FILTER_REJECTED',
+      setupQualityVersion: gradeResult ? null : null,
+    }));
   };
-
-  const candidates: NotificationCandidate[] = [];
-
-  // Collect all OBs and FVGs
-  const obs = detectAllOrderBlocks(candles15mCast, structureState15m.events);
-  const fvgs = detectAllFVGs(candles15mCast, structureState15m.events, symbol, '15m');
 
   // Process OBs
   for (const ob of obs) {
@@ -326,22 +404,31 @@ export function runPipeline(
     }
 
     // Range, Sweeps, Model
-    const rangeStates = candles15mCast.map((_, idx) =>
-      calculateRange(candles15mCast, swings15m, structureState15m, idx)
-    );
-    const sweeps = detectSweeps(candles15mCast, rangeStates, symbol, '15m');
-    const modelState = determineModel(structureState15m, sweeps, lastIndex15m);
+    const modelState = determineModel(structureState15m, sweeps, lastIndex15m, ob.relatedEvent);
 
     // Tests count
     const poiTestResult = countOBTests(candles15mCast, ob, lastIndex15m);
 
-    const liquidityMagnet = detectLiquidityMagnet(swings15m, candles15mCast[lastIndex15m].close, tradeDirection, symbol);
+    const liquidityMagnet = detectLiquidityMagnet(
+      swings15m,
+      candles15mCast[lastIndex15m].close,
+      tradeDirection,
+      symbol,
+      candles15mCast,
+      lastIndex15m
+    );
     const opposingObstacle = detectOpposingObstacle({
       symbol,
       tradeDirection,
       entryZone: { low: ob.low, high: ob.high },
       activeOrderBlocks15m: obs,
       activeFVGs15m: fvgs,
+      activeOrderBlocks1h: obs1H,
+      activeFVGs1h: fvgs1H,
+      candles15m: candles15mCast,
+      candles1h: candles1HCast,
+      currentIndex15m: lastIndex15m,
+      currentIndex1h: lastIndex1H,
     });
 
     // Build GradeInput
@@ -350,7 +437,7 @@ export function runPipeline(
       bias4H,
       pd4H,
       bias1H,
-      has15mEvent,
+      has15mEvent: isStructureEventUsable(ob.relatedEvent, lastIndex15m),
       displacementQuality15m: dq,
       modelState,
       poiTestResultForSweep: modelState.model === 'model1_reversal' ? poiTestResult : null,
@@ -364,7 +451,7 @@ export function runPipeline(
 
     const gradeResult = calculateGrade(gradeInput);
     if (productionOrPvpAdmission(gradeResult.entryAllowed, gradeResult.totalScore)) {
-      observePoiLifecycle('OB', ob, formedTimestamp, [], gradeResult.grade, true);
+      observePoiLifecycle('OB', ob, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult);
       const signalQualityResult = maybeEvaluateSignalQuality({
         poiType: 'OB',
         poi: ob,
@@ -372,6 +459,7 @@ export function runPipeline(
         currentPrice: candles15mCast[lastIndex15m].close,
         currentTimestamp: candles15mCast[lastIndex15m].timestamp,
         poiTestCount: poiTestResult.testCount,
+        symbol,
       });
       const setupAssessmentV2 = buildSetupAssessmentV2({
         signalId: uniqueKey,
@@ -390,7 +478,7 @@ export function runPipeline(
         poiTestCount: poiTestResult.testCount,
         structureEventType: ob.relatedEvent.type,
         trend15m: structureState15m.currentTrend,
-        sweeps,
+        sweeps: modelState.triggeringSweep ? [modelState.triggeringSweep] : [],
       });
       const setupAssessmentComparison = compareV1GradeWithV2Assessment(gradeResult, setupAssessmentV2);
 
@@ -437,7 +525,7 @@ export function runPipeline(
       recordSingleRuleAblation(gradeResult);
       recordGroupAblation(gradeResult);
       recordGradeRejection(gradeResult, reject);
-      observePoiLifecycle('OB', ob, formedTimestamp, gradeResult.blockReasons.length ? gradeResult.blockReasons : ['grade_below_A'], gradeResult.grade, false, gradeResult.poiIntegrity);
+      observePoiLifecycle('OB', ob, formedTimestamp, gradeResult.blockReasons.length ? gradeResult.blockReasons : ['grade_below_A'], gradeResult.grade, false, gradeResult.poiIntegrity, gradeResult);
     }
   }
 
@@ -500,22 +588,31 @@ export function runPipeline(
     }
 
     // Range, Sweeps, Model
-    const rangeStates = candles15mCast.map((_, idx) =>
-      calculateRange(candles15mCast, swings15m, structureState15m, idx)
-    );
-    const sweeps = detectSweeps(candles15mCast, rangeStates, symbol, '15m');
-    const modelState = determineModel(structureState15m, sweeps, lastIndex15m);
+    const modelState = determineModel(structureState15m, sweeps, lastIndex15m, fvg.relatedEvent);
 
     // Tests count
     const poiTestResult = countFVGTests(candles15mCast, fvg, lastIndex15m);
 
-    const liquidityMagnet = detectLiquidityMagnet(swings15m, candles15mCast[lastIndex15m].close, tradeDirection, symbol);
+    const liquidityMagnet = detectLiquidityMagnet(
+      swings15m,
+      candles15mCast[lastIndex15m].close,
+      tradeDirection,
+      symbol,
+      candles15mCast,
+      lastIndex15m
+    );
     const opposingObstacle = detectOpposingObstacle({
       symbol,
       tradeDirection,
       entryZone: { low: fvg.gapLow, high: fvg.gapHigh },
       activeOrderBlocks15m: obs,
       activeFVGs15m: fvgs,
+      activeOrderBlocks1h: obs1H,
+      activeFVGs1h: fvgs1H,
+      candles15m: candles15mCast,
+      candles1h: candles1HCast,
+      currentIndex15m: lastIndex15m,
+      currentIndex1h: lastIndex1H,
     });
 
     // Build GradeInput
@@ -524,7 +621,7 @@ export function runPipeline(
       bias4H,
       pd4H,
       bias1H,
-      has15mEvent,
+      has15mEvent: isStructureEventUsable(fvg.relatedEvent, lastIndex15m),
       displacementQuality15m: dq,
       modelState,
       poiTestResultForSweep: modelState.model === 'model1_reversal' ? poiTestResult : null,
@@ -538,7 +635,7 @@ export function runPipeline(
 
     const gradeResult = calculateGrade(gradeInput);
     if (productionOrPvpAdmission(gradeResult.entryAllowed, gradeResult.totalScore)) {
-      observePoiLifecycle('FVG', fvg, formedTimestamp, [], gradeResult.grade, true);
+      observePoiLifecycle('FVG', fvg, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult);
       const signalQualityResult = maybeEvaluateSignalQuality({
         poiType: 'FVG',
         poi: fvg,
@@ -546,6 +643,7 @@ export function runPipeline(
         currentPrice: candles15mCast[lastIndex15m].close,
         currentTimestamp: candles15mCast[lastIndex15m].timestamp,
         poiTestCount: poiTestResult.testCount,
+        symbol,
       });
       const setupAssessmentV2 = buildSetupAssessmentV2({
         signalId: uniqueKey,
@@ -564,7 +662,7 @@ export function runPipeline(
         poiTestCount: poiTestResult.testCount,
         structureEventType: fvg.relatedEvent.type,
         trend15m: structureState15m.currentTrend,
-        sweeps,
+        sweeps: modelState.triggeringSweep ? [modelState.triggeringSweep] : [],
       });
       const setupAssessmentComparison = compareV1GradeWithV2Assessment(gradeResult, setupAssessmentV2);
 
@@ -611,11 +709,18 @@ export function runPipeline(
       recordSingleRuleAblation(gradeResult);
       recordGroupAblation(gradeResult);
       recordGradeRejection(gradeResult, reject);
-      observePoiLifecycle('FVG', fvg, formedTimestamp, gradeResult.blockReasons.length ? gradeResult.blockReasons : ['grade_below_A'], gradeResult.grade, false, gradeResult.poiIntegrity);
+      observePoiLifecycle('FVG', fvg, formedTimestamp, gradeResult.blockReasons.length ? gradeResult.blockReasons : ['grade_below_A'], gradeResult.grade, false, gradeResult.poiIntegrity, gradeResult);
     }
   }
 
   return finish(consolidateCandidates(candidates));
+}
+
+function isStructureEventUsable(event: import('../src/types').StructureEvent, currentIndex: number): boolean {
+  return event.breakCandleIndex >= 0 &&
+    event.breakCandleIndex <= currentIndex &&
+    Number.isFinite(event.breakTimestamp) &&
+    Number.isFinite(event.breakClosePrice);
 }
 
 function latestCompletedCandle(candles: readonly Candle[]): Candle {
