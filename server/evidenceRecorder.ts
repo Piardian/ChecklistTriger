@@ -27,6 +27,7 @@ import { evaluateSignalValidationGate } from '../src/signalValidationGate';
 import { assessPresentationV1 } from '../src/presentationAssessment';
 import { FVG, OrderBlock } from '../src/types';
 import { evaluateHardMarketWindow, isWithinKillzone } from './killzone';
+import { resolveMarketSession } from '../src/marketSession';
 
 const defaultStore = new JsonlEvidenceStore();
 
@@ -164,15 +165,16 @@ export function buildSignalEvidenceRecord(
 
   const createdDate = new Date(createdAt);
   const hourUtc = createdDate.getUTCHours();
-  const dayOfWeek = createdDate.getUTCDay();
-  const dayOfWeekName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayOfWeek];
-  const session = hourUtc >= 0 && hourUtc < 7
+  const sessionContext = resolveMarketSession(createdAt);
+  const dayOfWeek = sessionContext.dayOfWeek;
+  const dayOfWeekName = sessionContext.dayOfWeekName;
+  const session = sessionContext.session === 'asian'
     ? 'ASIA'
-    : hourUtc >= 7 && hourUtc < 12
+    : sessionContext.session === 'london'
       ? 'LONDON'
-      : hourUtc >= 12 && hourUtc < 16
+      : sessionContext.session === 'overlap'
         ? 'LONDON_NY_OVERLAP'
-        : hourUtc >= 16 && hourUtc < 21
+        : sessionContext.session === 'new_york'
           ? 'NEW_YORK'
           : 'OFF_HOURS';
 
@@ -220,6 +222,7 @@ export function buildSignalEvidenceRecord(
       grade: candidate.gradeResult.grade,
       score: candidate.gradeResult.totalScore,
       entryAllowed: candidate.gradeResult.entryAllowed,
+      rulebookVersion: candidate.gradeResult.rulebookVersion,
     },
     htfContext: {
       bias4H: candidate.bias4H,
@@ -227,7 +230,7 @@ export function buildSignalEvidenceRecord(
       pd4H: candidate.pd4H,
       pd1H: candidate.pd1H,
       pd15M: candidate.pd15M ?? null,
-      bias15M: null,
+      bias15M: candidate.setupAssessmentV2?.detector.structure.trend15m ?? null,
       htfAlignmentState,
     },
     structure: {
@@ -235,7 +238,13 @@ export function buildSignalEvidenceRecord(
       eventTimestamp: event.breakTimestamp,
       eventTimeframe: '15m',
       structureScore: candidate.gradeResult.breakdown.structure,
-      swingContext: null,
+      swingContext: {
+        brokenSwingType: event.brokenSwing.type,
+        brokenSwingPrice: event.brokenSwing.price,
+        formedAtIndex: event.brokenSwing.formedAtIndex,
+        confirmedAtIndex: event.brokenSwing.confirmedAtIndex,
+        timestamp: event.brokenSwing.timestamp,
+      },
     },
     poi: {
       poiType: candidate.poiType,
@@ -254,12 +263,12 @@ export function buildSignalEvidenceRecord(
       bodyPercentage: eventCandle ? calculateBodyPercentage(eventCandle) : null,
       range: eventCandle ? eventCandle.high - eventCandle.low : null,
       impulseDirection: event.direction,
-      atrNormalizedDisplacement: null,
+      atrNormalizedDisplacement: calculateAtrNormalizedDisplacement(candles15m, event.breakCandleIndex, eventCandle),
     },
     sweep: {
-      sweepDetected: candidate.gradeResult.breakdown.sweep > 0,
+      sweepDetected: Boolean(candidate.setupAssessmentV2?.detector.sweep.timestamp),
       sweepDirection: candidate.tradeDirection,
-      sweepQuality: sweepQuality(candidate.gradeResult.breakdown.sweep),
+      sweepQuality: candidate.setupAssessmentV2?.detector.sweep.timestamp ? 'strong' : 'missing',
     },
     model: {
       modelState: modelState(candidate.gradeResult.breakdown.sweep),
@@ -278,9 +287,11 @@ export function buildSignalEvidenceRecord(
       dayOfWeek,
       dayOfWeekName,
       hourUtc,
-      volatilityAtr: null,
+      hourLocal: sessionContext.hourLocal,
+      timezone: sessionContext.timezone,
+      volatilityAtr: calculateAtrPips(candles15m, eventCandle ? candles15m.indexOf(eventCandle) : candles15m.length - 1, candidate.symbol),
       marketWindowState: marketWindowStatus,
-      marketRegime: null,
+      marketRegime: candidate.setupAssessmentV2?.context.marketPhase.value ?? null,
     },
     ...(candidate.signalQualityResult ? { signalQuality: candidate.signalQualityResult } : {}),
     ...(candidate.setupAssessmentV2 && candidate.setupAssessmentComparison ? {
@@ -464,6 +475,49 @@ function readPackageVersion(): string {
   } catch {
     return '0.0.0';
   }
+}
+
+function calculateAtrPips(
+  candles: readonly StoredCandle[],
+  currentIndex: number,
+  symbol: string
+): number | null {
+  if (currentIndex < 1) return null;
+  const pip = symbol.includes('JPY') ? 0.01 : 0.0001;
+  const start = Math.max(1, currentIndex - 13);
+  const ranges: number[] = [];
+  for (let index = start; index <= currentIndex; index += 1) {
+    const candle = candles[index];
+    const previousClose = candles[index - 1].close;
+    ranges.push(Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previousClose),
+      Math.abs(candle.low - previousClose)
+    ));
+  }
+  return ranges.length === 0 ? null : ranges.reduce((sum, value) => sum + value, 0) / ranges.length / pip;
+}
+
+function calculateAtrNormalizedDisplacement(
+  candles: readonly StoredCandle[],
+  eventIndex: number,
+  eventCandle: StoredCandle | null
+): number | null {
+  if (!eventCandle || eventIndex < 1) return null;
+  const start = Math.max(1, eventIndex - 13);
+  const ranges: number[] = [];
+  for (let index = start; index <= eventIndex; index += 1) {
+    const candle = candles[index];
+    const previousClose = candles[index - 1].close;
+    ranges.push(Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previousClose),
+      Math.abs(candle.low - previousClose)
+    ));
+  }
+  const atr = ranges.length ? ranges.reduce((sum, value) => sum + value, 0) / ranges.length : 0;
+  const eventRange = eventCandle.high - eventCandle.low;
+  return atr > 0 ? eventRange / atr : null;
 }
 
 function parseList(value: string): string[] {
