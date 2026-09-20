@@ -20,6 +20,10 @@ export const GRADE_RULES = Object.freeze({
     immediateObstacleDistancePips: 15,
     immediateObstacleMaxGrade: 'B+',
   }),
+  scoring: Object.freeze({
+    fifteenMinuteOppositePdPenalty: 1,
+    liquidityMagnetBonus: 1,
+  }),
   minEntry: Object.freeze({ displacementGradePoints: 1, maxPoiTests: 1 }),
 });
 
