@@ -88,6 +88,8 @@ export interface SignalMarketContextEvidence {
   readonly dayOfWeek: number;
   readonly dayOfWeekName: string;
   readonly hourUtc: number;
+  readonly hourLocal?: number;
+  readonly timezone?: string;
   readonly volatilityAtr: number | null;
   readonly marketWindowState: {
     readonly active: boolean;
@@ -104,6 +106,7 @@ export interface SignalClassificationEvidence {
   readonly grade: GradeResult['grade'];
   readonly score: number;
   readonly entryAllowed: boolean;
+  readonly rulebookVersion?: string;
 }
 
 export interface SignalEvidenceRecord {
