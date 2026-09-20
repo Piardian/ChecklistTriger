@@ -73,7 +73,8 @@ export function scoreDisplacementQuality(
   } else {
     // Check for raw imbalance
     let hasRawImbalance = false;
-    for (let i = leg.startIndex; i <= leg.endIndex; i++) {
+    const safeEndIndex = Math.min(leg.endIndex - 1, candles.length - 2);
+    for (let i = leg.startIndex; i <= safeEndIndex; i++) {
       if (i - 1 >= 0 && i + 1 < candles.length) {
         if (leg.direction === 'bullish') {
           if (candles[i + 1].low > candles[i - 1].high) {
