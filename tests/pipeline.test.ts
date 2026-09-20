@@ -283,21 +283,30 @@ function appendPipelineCandles(
   candles15m[6].low = 75;
 
   candles15m[6].high = 80;
+  candles15m[6].low = 70;
   candles15m[7].high = 85;
+  candles15m[7].low = 72;
   candles15m[8].high = 90;
+  candles15m[8].low = 75;
   candles15m[9].high = 88;
+  candles15m[9].low = 73;
   candles15m[10].high = 86;
-
   candles15m[10].low = 82;
+  candles15m[11].high = 101;
   candles15m[11].low = 85;
+  candles15m[12].high = 101;
   candles15m[12].low = 80;
+  candles15m[13].high = 101;
   candles15m[13].low = 88;
+  candles15m[14].high = 92;
   candles15m[14].low = 87;
 
-  candles15m[14].high = 92;
   candles15m[15].high = 95;
+  candles15m[15].low = 90;
   candles15m[16].high = 100;
+  candles15m[16].low = 90;
   candles15m[17].high = 99;
+  candles15m[17].low = 90;
 
   // Bearish OB candle immediately before the bullish displacement leg.
   candles15m[17] = {
