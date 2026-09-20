@@ -148,6 +148,7 @@ describe('Displacement Quality Scorer', () => {
     // Setup 2: Total = 2.5 (body = 0.5, consecutive = 1, size = 0.5, fvg = 0.5) -> orta (+1)
     // Change size to medium (range = 10 pips -> size = 0.5)
     // Change body to medium (body = 0.5)
+    candles[4].high = 1.0505; // Restore the 10-pip prior-range baseline before Setup 2.
     for (let i = 5; i <= 7; i++) {
       candles[i] = { timestamp: i * 1000, open: 1.0496, high: 1.0505, low: 1.0495, close: 1.0502 }; // body 60%
     }
