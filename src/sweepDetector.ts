@@ -102,8 +102,8 @@ export function detectSweeps(
             closePrice: candle.close,
             closeRelation: 'inside_range',
           });
+          sweptLowLevel = rangeState.rangeLow;
         }
-        sweptLowLevel = rangeState.rangeLow;
       }
     }
 
@@ -123,8 +123,8 @@ export function detectSweeps(
             closePrice: candle.close,
             closeRelation: 'inside_range',
           });
+          sweptHighLevel = rangeState.rangeHigh;
         }
-        sweptHighLevel = rangeState.rangeHigh;
       }
     }
   }
