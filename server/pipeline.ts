@@ -26,6 +26,7 @@ import { consolidateCandidates } from '../src/poiConsolidator';
 import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
 import { isPoiInvalidated as evaluatePoiInvalidation } from '../src/poiValidity';
+import { getPoiTtlMs, getMinimumDisplacementGradePoints, getDistanceRule } from '../src/smcAdmissionRulebook';
 import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
 
 export interface NotificationCandidate {
@@ -816,7 +817,7 @@ export function filterClosedCandles(
   );
 }
 
-export const MAX_POI_AGE_MS = 48 * 60 * 60 * 1000; // 48 Hours POI TTL (Anti-Stale / Anti-Ghost POI)
+export const MAX_POI_AGE_MS = getPoiTtlMs();
 
 export function isDistanceExcessive(
   symbol: string,
@@ -829,21 +830,10 @@ export function isDistanceExcessive(
   }
   const distInfo = calculateDistance(symbol, currentPrice, zoneLow, zoneHigh);
   const assetClass = detectAssetClass(symbol);
-  if (assetClass === 'FOREX') {
-    return distInfo.distanceUnits > 35;
-  }
-  if (assetClass === 'FOREX_JPY') {
-    return distInfo.distanceUnits > 50;
-  }
-  if (assetClass === 'COMMODITY') {
-    if (symbol.toUpperCase().startsWith('XAU')) {
-      // Gold intraday max distance: 25.0 USD (250 pips) or 0.60%
-      return distInfo.distanceUnits > 25.0 || distInfo.percentDistance > 0.60;
-    }
-    return distInfo.percentDistance > 1.0;
-  }
-  // CRYPTO, INDEX
-  return distInfo.percentDistance > 1.5;
+  const rule = getDistanceRule(symbol, assetClass);
+  if (rule.maxUnits !== undefined && distInfo.distanceUnits > rule.maxUnits) return true;
+  if (rule.maxPercent !== null && distInfo.percentDistance > rule.maxPercent) return true;
+  return false;
 }
 
 function distanceToZonePips(symbol: string, currentPrice: number, low: number, high: number): number {
@@ -929,7 +919,7 @@ function accelerationEnabled(): boolean {
 }
 
 function minimumDisplacementPoints(): number {
-  return 1;
+  return getMinimumDisplacementGradePoints();
 }
 
 function productionOrPvpAdmission(entryAllowed: boolean, _score: number): boolean {
