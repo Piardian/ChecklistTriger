@@ -365,6 +365,17 @@ function appendPipelineCandles(
     low: 99,
     close: 110,
   };
+  // Keep the post-break observation window neutral and below the midpoint so
+  // the latest closed price remains in 4H/1H Discount without creating a new swing.
+  for (let i = 21; i < 25; i += 1) {
+    candles15m[i] = {
+      timestamp: candles15m[i].timestamp,
+      open: 89,
+      high: 91,
+      low: 89,
+      close: 90,
+    };
+  }
 
   // 4H/1H context: bullish structure with current price in Discount.
   const contextCandles = candles15m.map(candle => ({ ...candle }));
