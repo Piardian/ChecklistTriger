@@ -22,6 +22,31 @@ export class NotifiedStore {
     return this.readKeys().includes(uniqueKey);
   }
 
+  /**
+   * Checks whether any POI for the given symbol originating from `breakTimestamp` or a NEWER
+   * structural break has already been notified (or is pending).
+   * Prevents "peeling the onion" (falling back to older breaks or backup FVGs of the same break).
+   */
+  hasImpulseOrNewerBeenNotified(symbol: string, breakTimestamp: number): boolean {
+    const prefix = `${symbol}_15m_`;
+    const checkKey = (key: string): boolean => {
+      if (!key.startsWith(prefix)) return false;
+      // Signal ID format: ${pair}_${timeframe}_${poiType}_${formedTimestamp}_${eventTimestamp}
+      const parts = key.split('_');
+      if (parts.length !== 5) return false;
+      const poiType = parts[2];
+      if (poiType !== 'OB' && poiType !== 'FVG') return false;
+      const notifiedBreakTs = Number(parts[4]);
+      return Number.isFinite(notifiedBreakTs) && notifiedBreakTs >= breakTimestamp;
+    };
+
+    for (const key of this.pending) {
+      if (checkKey(key)) return true;
+    }
+    const keys = this.readKeys();
+    return keys.some(checkKey);
+  }
+
   markPending(uniqueKey: string): void { this.pending.add(uniqueKey); }
   clearPending(uniqueKey: string): void { this.pending.delete(uniqueKey); }
 

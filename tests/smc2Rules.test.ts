@@ -301,8 +301,9 @@ describe('SMC Engine 2.0 Hardening Rules (Benchmark Driven)', () => {
       expect(isBoxTooNarrow('EURUSD', 1.16029, 1.16226)).toBe(false);
       // USDJPY 9.1 pips (Sinyal 48 Active)
       expect(isBoxTooNarrow('USDJPY', 153.821, 153.912)).toBe(false);
-      // NZDUSD 3.1 pips (Sinyal 52 Active)
-      expect(isBoxTooNarrow('NZDUSD', 0.58333, 0.58364)).toBe(false);
+      // NZDUSD 3.1 pips micro-box is rejected under 7-pip floor, 8.0 pips passes
+      expect(isBoxTooNarrow('NZDUSD', 0.58333, 0.58364)).toBe(true);
+      expect(isBoxTooNarrow('NZDUSD', 0.58300, 0.58380)).toBe(false);
     });
   });
 });

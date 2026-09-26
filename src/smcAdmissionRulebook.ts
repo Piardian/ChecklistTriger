@@ -14,13 +14,13 @@ export const SMC_ADMISSION_RULES = Object.freeze({
   }),
   box: Object.freeze({
     FOREX: Object.freeze({
-      defaultMinUnits: 2.8,
-      volatileCrossMinUnits: 5.0,
+      defaultMinUnits: 7.0,
+      volatileCrossMinUnits: 7.0,
       volatileCrossSymbols: Object.freeze(['CHF', 'CAD']),
     }),
     FOREX_JPY: Object.freeze({
-      defaultMinUnits: 4.0,
-      crossMinUnits: 5.0,
+      defaultMinUnits: 7.0,
+      crossMinUnits: 7.0,
       crossPrefixes: Object.freeze(['GBP', 'CHF', 'EUR']),
     }),
     COMMODITY: Object.freeze({
@@ -30,13 +30,13 @@ export const SMC_ADMISSION_RULES = Object.freeze({
     CRYPTO: Object.freeze({
       btcMinUnits: 50.0,
       btcMinPercent: 0.06,
-      altcoinMinPercent: 0.25,
+      altcoinMinPercent: 0.35,
     }),
     INDEX: Object.freeze({
       minUnits: 2.0,
       minPercent: 0.15,
     }),
-    fallbackMinUnits: 3.0,
+    fallbackMinUnits: 7.0,
     dynamicAtrFraction: 0.25,
   }),
 });

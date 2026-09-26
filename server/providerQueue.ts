@@ -212,22 +212,25 @@ export class DeterministicProviderQueue {
         return result;
       } catch (error) {
         recordProviderTelemetry(providerFailureTelemetry(job, error));
-        if (!(error instanceof ProviderRateLimitError) || job.retryCount >= this.maxRetries) {
-          throw error;
-        }
-
-        const cooldownDuration = error.retryAfterMs ?? (60_000 + this.windowBufferMs);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const isDailyLimit = errMsg.toLowerCase().includes('run out of api credits') || errMsg.toLowerCase().includes('daily');
+        const retryAfter = error instanceof ProviderRateLimitError ? error.retryAfterMs : null;
+        const cooldownDuration = isDailyLimit ? 3600_000 : (retryAfter ?? (60_000 + this.windowBufferMs));
         this.keyWindows[keyIdx].cooldownUntilMs = this.now() + cooldownDuration;
-
-        job.retryCount += 1;
-        this.retries += 1;
-        this.emitQueueTelemetry('RETRY_WAIT', job);
 
         const otherKeyAvailable = this.keyWindows.some((kw, i) => i !== keyIdx && this.now() >= kw.cooldownUntilMs);
         if (otherKeyAvailable && this.keyCount > 1) {
           currentKeyIndex = (keyIdx + 1) % this.keyCount;
           continue;
         }
+
+        if (!(error instanceof ProviderRateLimitError) || job.retryCount >= this.maxRetries) {
+          throw error;
+        }
+
+        job.retryCount += 1;
+        this.retries += 1;
+        this.emitQueueTelemetry('RETRY_WAIT', job);
 
         await this.waitForNextCreditWindow(error.retryAfterMs);
       }

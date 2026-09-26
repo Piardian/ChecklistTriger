@@ -376,7 +376,11 @@ export function runPipeline(
       eventTimestamp: ob.relatedEvent.breakTimestamp,
     });
     const dedupeKey = createPoiDedupeKey(symbol, tradeDirection, 'OB', formedTimestamp, ob.low, ob.high);
-    if (notifiedStore.hasBeenNotified(uniqueKey) || notifiedStore.hasBeenNotified(dedupeKey)) {
+    if (
+      notifiedStore.hasBeenNotified(uniqueKey) ||
+      notifiedStore.hasBeenNotified(dedupeKey) ||
+      notifiedStore.hasImpulseOrNewerBeenNotified(symbol, ob.relatedEvent.breakTimestamp)
+    ) {
       reject('duplicate_poi');
       observePoiLifecycle('OB', ob, formedTimestamp, ['duplicate_poi']);
       continue;
@@ -489,6 +493,25 @@ export function runPipeline(
         trend15m: structureState15m.currentTrend,
         sweeps: modelState.triggeringSweep ? [modelState.triggeringSweep] : [],
       });
+      if (!isV2AssessmentAdmissible(setupAssessmentV2)) {
+        recordV2Rejection(setupAssessmentV2, reject);
+        observePoiLifecycle(
+          'OB',
+          ob,
+          formedTimestamp,
+          setupAssessmentV2.decision.rejectReasons.length > 0
+            ? setupAssessmentV2.decision.rejectReasons
+            : setupAssessmentV2.decision.gradeCaps.length > 0
+              ? setupAssessmentV2.decision.gradeCaps
+              : ['v2_assessment_rejected'],
+          gradeResult.grade,
+          false,
+          gradeResult.poiIntegrity,
+          gradeResult,
+          setupAssessmentV2
+        );
+        continue;
+      }
       const setupAssessmentComparison = compareV1GradeWithV2Assessment(gradeResult, setupAssessmentV2);
       observePoiLifecycle('OB', ob, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult, setupAssessmentV2);
 
@@ -569,7 +592,11 @@ export function runPipeline(
       eventTimestamp: fvg.relatedEvent.breakTimestamp,
     });
     const dedupeKey = createPoiDedupeKey(symbol, tradeDirection, 'FVG', formedTimestamp, fvg.gapLow, fvg.gapHigh);
-    if (notifiedStore.hasBeenNotified(uniqueKey) || notifiedStore.hasBeenNotified(dedupeKey)) {
+    if (
+      notifiedStore.hasBeenNotified(uniqueKey) ||
+      notifiedStore.hasBeenNotified(dedupeKey) ||
+      notifiedStore.hasImpulseOrNewerBeenNotified(symbol, fvg.relatedEvent.breakTimestamp)
+    ) {
       reject('duplicate_poi');
       observePoiLifecycle('FVG', fvg, formedTimestamp, ['duplicate_poi']);
       continue;
@@ -682,6 +709,25 @@ export function runPipeline(
         trend15m: structureState15m.currentTrend,
         sweeps: modelState.triggeringSweep ? [modelState.triggeringSweep] : [],
       });
+      if (!isV2AssessmentAdmissible(setupAssessmentV2)) {
+        recordV2Rejection(setupAssessmentV2, reject);
+        observePoiLifecycle(
+          'FVG',
+          fvg,
+          formedTimestamp,
+          setupAssessmentV2.decision.rejectReasons.length > 0
+            ? setupAssessmentV2.decision.rejectReasons
+            : setupAssessmentV2.decision.gradeCaps.length > 0
+              ? setupAssessmentV2.decision.gradeCaps
+              : ['v2_assessment_rejected'],
+          gradeResult.grade,
+          false,
+          gradeResult.poiIntegrity,
+          gradeResult,
+          setupAssessmentV2
+        );
+        continue;
+      }
       const setupAssessmentComparison = compareV1GradeWithV2Assessment(gradeResult, setupAssessmentV2);
       observePoiLifecycle('FVG', fvg, formedTimestamp, [], gradeResult.grade, true, gradeResult.poiIntegrity, gradeResult, setupAssessmentV2);
 
@@ -1061,7 +1107,9 @@ function buildSetupAssessmentV2(input: {
       trend15m: input.trend15m,
     },
     sweep: {
-      present: input.gradeResult.breakdown.sweep > 0,
+      present: input.structureEventType === 'CHoCH'
+        ? latestSweep !== null
+        : input.gradeResult.breakdown.sweep > 0,
       type: latestSweep?.type === 'sweep_high' ? 'Range High' : latestSweep?.type === 'sweep_low' ? 'Range Low' : 'Unknown',
       timestamp: latestSweep?.timestamp ?? null,
       source: latestSweep ? 'detector' : 'unknown',
@@ -1098,6 +1146,22 @@ function buildSetupAssessmentV2(input: {
     detector,
     v1Grade: input.gradeResult,
   });
+}
+
+function isV2AssessmentAdmissible(assessment: SetupAssessment): boolean {
+  if (assessment.decision.hardReject) return false;
+  return assessment.grade.value === 'A+' || assessment.grade.value === 'A' || assessment.grade.value === 'A-';
+}
+
+function recordV2Rejection(assessment: SetupAssessment, reject: (reason: string) => void): void {
+  const hardRejects = assessment.decision.appliedRules?.hardRejects ?? [];
+  if (hardRejects.length > 0) {
+    for (const rule of hardRejects) {
+      reject(`v2_hard_reject_${rule.id.toLowerCase()}`);
+    }
+    return;
+  }
+  reject(`v2_grade_cap_${assessment.grade.value.toLowerCase()}`);
 }
 
 function resolvePoiZone(type: 'OB' | 'FVG', poi: OrderBlock | FVG): { high: number; low: number } {

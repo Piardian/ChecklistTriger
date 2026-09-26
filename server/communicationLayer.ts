@@ -133,12 +133,18 @@ function buildSections(
   const actionSummary = buildActionSummary(executionView, signal);
   const reasonSummary = buildReasonSummary(candidate, executionView, signal, narrative);
   const statusSummary = buildStatusSummary(executionView, signal);
+  const isVolatileOrCross = ['GBPCHF', 'EURCHF', 'CADCHF', 'LTCUSD', 'EURGBP'].some(token => candidate.symbol.toUpperCase().includes(token));
+  const isChoch = candidate.poi?.relatedEvent?.type === 'CHoCH' || candidate.setupAssessmentV2?.detector?.structure?.eventType === 'CHoCH';
+  const recommendedRisk = (!isChoch && !isVolatileOrCross && ['BTCUSD', 'NZDUSD', 'EURUSD', 'USDCHF', 'CHFJPY', 'SOLUSD'].includes(candidate.symbol.toUpperCase()))
+    ? 'Tam Risk (%1.0R)'
+    : 'Defansif Risk (%0.5R)';
 
   const sections: CommunicationSection[] = [
     section('ÖZET', [
       field('Parite', candidate.symbol),
       field('Yön', signal.actionText),
       field('Grade', `${grade} (${totalScore}/9)`),
+      field('Önerilen Risk', recommendedRisk),
       field('Şimdi ne yapmalıyım?', actionSummary),
     ]),
     section('DURUM', [

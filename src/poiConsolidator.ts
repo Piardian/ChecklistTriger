@@ -48,18 +48,28 @@ export function consolidateCandidates(
       return c.poi.relatedEvent.breakTimestamp === latestBreakTimestamp;
     });
 
+    // If the active impulse already has a valid OB candidate, suppress backup FVGs from the same impulse
+    const hasObInActiveLeg = activeLegCandidates.some(c => c.poiType === 'OB');
+    const filteredActiveLeg = hasObInActiveLeg
+      ? activeLegCandidates.filter(c => c.poiType === 'OB')
+      : activeLegCandidates;
+
     // If latest break has valid candidates, use them; otherwise fallback to the sorted list
-    const candidatePool = activeLegCandidates.length > 0 ? activeLegCandidates : groupCandidates;
+    const candidatePool = filteredActiveLeg.length > 0 ? filteredActiveLeg : groupCandidates;
 
     // Sort by:
     // 1. Structure Break Timestamp descending (most recent impulse first)
     // 2. Grade total score descending (A+ > A > B+)
-    // 3. POI Test count ascending (fresher / 0 tests first)
+    // 3. POI Type priority (OB before FVG on ties)
+    // 4. POI Test count ascending (fresher / 0 tests first)
     const sorted = [...candidatePool].sort((a, b) => {
       const breakDiff = b.poi.relatedEvent.breakTimestamp - a.poi.relatedEvent.breakTimestamp;
       if (breakDiff !== 0) return breakDiff;
       const scoreDiff = b.gradeResult.totalScore - a.gradeResult.totalScore;
       if (scoreDiff !== 0) return scoreDiff;
+      if (a.poiType !== b.poiType) {
+        return a.poiType === 'OB' ? -1 : 1;
+      }
       return a.poiTestCount - b.poiTestCount;
     });
 
