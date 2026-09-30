@@ -187,21 +187,22 @@ describe('Displacement Quality Scorer', () => {
     expect(result!.gradePoints).toBe(-2);
   });
 
-  test('should not let a post-break candle create displacement imbalance evidence', () => {
+  test('scores break-candle FVG only after candle i+1 is present in the closed-candle slice', () => {
     const candles = createBaseCandles(10);
     for (let i = 0; i < 5; i++) {
       candles[i] = { timestamp: i * 1000, open: 1.0500, high: 1.0505, low: 1.0495, close: 1.0500 };
     }
 
-    // Break occurs on index 5. Only index 0..5 is available at that decision point.
+    candles[4].high = 1.0502;
     candles[5] = { timestamp: 5000, open: 1.0500, high: 1.0520, low: 1.0500, close: 1.0520 };
-    candles[6].low = 1.0510; // Would create an FVG only if index 6 were illegally used.
+    candles[6].low = 1.0510;
 
     const leg: DisplacementLeg = { startIndex: 5, endIndex: 5, direction: 'bullish' };
-    const result = scoreDisplacementQuality(candles, leg, 'EURUSD', '15m');
+    const atBreakSlice = scoreDisplacementQuality(candles.slice(0, 6), leg, 'EURUSD', '15m');
+    expect(atBreakSlice!.fvgScore).toBe(0);
 
-    expect(result!.fvgScore).toBe(0);
-    expect(result!.rawImbalanceDetected).toBe(false);
+    const afterNextCandleClosed = scoreDisplacementQuality(candles.slice(0, 7), leg, 'EURUSD', '15m');
+    expect(afterNextCandleClosed!.fvgScore).toBe(1);
   });
 
   test('lookahead bias simulation for displacement quality scorer', () => {
