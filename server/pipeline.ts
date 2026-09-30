@@ -1,6 +1,6 @@
 import { CandleStore } from './candleStore';
 import { NotifiedStore } from './notifiedStore';
-import { OrderBlock, FVG, Candle, PremiumDiscountState } from '../src/types';
+import { OrderBlock, FVG, Candle, PremiumDiscountState, DisplacementQuality } from '../src/types';
 import { detectSwings } from '../src/swingDetector';
 import { detectStructure } from '../src/structureDetector';
 import { calculatePremiumDiscount } from '../src/premiumDiscountCalculator';
@@ -9,7 +9,7 @@ import { detectAllFVGs } from '../src/fvgDetector';
 import { findDisplacementLeg } from '../src/displacementLeg';
 import { scoreDisplacementQuality } from '../src/displacementQualityScorer';
 import { calculateRange } from '../src/rangeCalculator';
-import { detectSweeps } from '../src/sweepDetector';
+import { detectSweeps, detectSwingSweeps, mergeSweepEvents } from '../src/sweepDetector';
 import { determineModel, ModelState } from '../src/modelDeterminer';
 import { countOBTests, countFVGTests } from '../src/poiTestCounter';
 import { calculateGrade, GradeInput, GradeResult } from '../src/gradeCalculator';
@@ -218,7 +218,10 @@ export function runPipeline(
   const rangeStates = candles15mCast.map((_, idx) =>
     calculateRange(candles15mCast, swings15m, structureState15m, idx)
   );
-  const sweeps = detectSweeps(candles15mCast, rangeStates, symbol, '15m');
+  const sweeps = mergeSweepEvents(
+    detectSweeps(candles15mCast, rangeStates, symbol, '15m'),
+    detectSwingSweeps(candles15mCast, swings15m, symbol, '15m')
+  );
 
   const candidates: NotificationCandidate[] = [];
 
@@ -445,6 +448,17 @@ export function runPipeline(
       currentIndex1h: lastIndex1H,
     });
 
+    const allowTrendContinuationPD = shouldAllowTrendContinuationPD(
+      symbol,
+      tradeDirection,
+      bias4H,
+      bias1H,
+      pd15M,
+      modelState,
+      dq,
+      pd1H
+    );
+
     // Build GradeInput
     const gradeInput: GradeInput = {
       tradeDirection,
@@ -454,13 +468,16 @@ export function runPipeline(
       has15mEvent: isStructureEventUsable(ob.relatedEvent, lastIndex15m),
       displacementQuality15m: dq,
       modelState,
-      poiTestResultForSweep: modelState.model === 'model1_reversal' ? poiTestResult : null,
+      poiTestResultForSweep: modelState.model === 'model1_reversal'
+        ? (modelState.triggeringSweep ? { ...poiTestResult, testCount: Math.max(1, poiTestResult.testCount) } : poiTestResult)
+        : null,
       poiTimeframe: '15m',
       poiTestCount: poiTestResult.testCount,
       pd1H: pd1H,
       pd15M,
       liquidityMagnet,
       opposingObstacle,
+      allowTrendContinuationPD,
     };
 
     const gradeResult = calculateGrade(gradeInput);
@@ -553,7 +570,7 @@ export function runPipeline(
         admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
-          modelState,
+        modelState,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
@@ -661,6 +678,17 @@ export function runPipeline(
       currentIndex1h: lastIndex1H,
     });
 
+    const allowTrendContinuationPD = shouldAllowTrendContinuationPD(
+      symbol,
+      tradeDirection,
+      bias4H,
+      bias1H,
+      pd15M,
+      modelState,
+      dq,
+      pd1H
+    );
+
     // Build GradeInput
     const gradeInput: GradeInput = {
       tradeDirection,
@@ -670,13 +698,16 @@ export function runPipeline(
       has15mEvent: isStructureEventUsable(fvg.relatedEvent, lastIndex15m),
       displacementQuality15m: dq,
       modelState,
-      poiTestResultForSweep: modelState.model === 'model1_reversal' ? poiTestResult : null,
+      poiTestResultForSweep: modelState.model === 'model1_reversal'
+        ? (modelState.triggeringSweep ? { ...poiTestResult, testCount: Math.max(1, poiTestResult.testCount) } : poiTestResult)
+        : null,
       poiTimeframe: '15m',
       poiTestCount: poiTestResult.testCount,
       pd1H: pd1H,
       pd15M,
       liquidityMagnet,
       opposingObstacle,
+      allowTrendContinuationPD,
     };
 
     const gradeResult = calculateGrade(gradeInput);
@@ -769,7 +800,7 @@ export function runPipeline(
         admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
-        });
+      });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
       recordSingleRuleAblation(gradeResult);
@@ -842,6 +873,48 @@ export function runPipeline(
       }));
     }
   }
+}
+
+export function shouldAllowTrendContinuationPD(
+  _symbol: string,
+  tradeDirection: 'long' | 'short',
+  bias4H: 'bullish' | 'bearish' | 'range' | 'undefined',
+  bias1H: 'bullish' | 'bearish' | 'range' | 'undefined',
+  pd15M: PremiumDiscountState | undefined,
+  modelState: ModelState,
+  dq: DisplacementQuality | null,
+  pd1H?: PremiumDiscountState
+): boolean {
+  const hasValidModel =
+    modelState.model === 'model2_continuation' ||
+    (modelState.model === 'model1_reversal' && modelState.triggeringSweep !== null);
+  if (!hasValidModel) return false;
+
+  const expectedBias = tradeDirection === 'long' ? 'bullish' : 'bearish';
+  if (bias4H !== expectedBias || bias1H !== expectedBias) return false;
+
+  const is15MPDOpposite = Boolean(
+    pd15M &&
+    ((tradeDirection === 'long' && pd15M.status === 'premium') ||
+     (tradeDirection === 'short' && pd15M.status === 'discount'))
+  );
+  const is1HPDInIdealZone = Boolean(
+    pd1H &&
+    ((tradeDirection === 'long' && pd1H.status === 'discount') ||
+     (tradeDirection === 'short' && pd1H.status === 'premium'))
+  );
+  if (is15MPDOpposite && !is1HPDInIdealZone) return false;
+
+  const is15MPDInIdealZone = Boolean(
+    pd15M &&
+    ((tradeDirection === 'long' && pd15M.status === 'discount') ||
+     (tradeDirection === 'short' && pd15M.status === 'premium'))
+  );
+  if (dq !== null && dq.gradePoints >= 1 && (is1HPDInIdealZone || is15MPDInIdealZone)) {
+    return true;
+  }
+
+  return dq !== null && dq.gradePoints >= 2 && dq.quality === 'güçlü';
 }
 
 function isStructureEventUsable(event: import('../src/types').StructureEvent, currentIndex: number): boolean {

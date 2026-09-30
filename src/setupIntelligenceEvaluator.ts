@@ -67,6 +67,14 @@ function analyzeContext(detector: DetectorResult): ContextAnalysis {
     (detector.direction === 'long' && pd4H === 'discount') ||
     (detector.direction === 'short' && pd4H === 'premium');
 
+  const intradayPdSupportsDirection =
+    (detector.direction === 'long' && (pd1H === 'discount' || pd15M === 'discount') && !(pd1H === 'premium' && pd15M === 'premium')) ||
+    (detector.direction === 'short' && (pd1H === 'premium' || pd15M === 'premium') && !(pd1H === 'discount' && pd15M === 'discount'));
+  const is4HEqAcceptable =
+    pd4H === 'eq' &&
+    !((detector.direction === 'long' && pd1H === 'premium') || (detector.direction === 'short' && pd1H === 'discount'));
+  const pdAcceptable = pdSupportsDirection || is4HEqAcceptable || (htfSupportsDirection && intradayPdSupportsDirection);
+
   if (!pdSupportsDirection) {
     pdConflicts.push(`4H Premium/Discount does not ideally support ${detector.direction}.`);
   }
@@ -90,8 +98,8 @@ function analyzeContext(detector: DetectorResult): ContextAnalysis {
       conflictReasons: htfConflicts,
     },
     premiumDiscount: {
-      quality: pdConflicts.length === 0 ? 'Ideal' : pdSupportsDirection ? 'Acceptable' : 'Weak',
-      supportsDirection: pdSupportsDirection,
+      quality: pdConflicts.length === 0 ? 'Ideal' : pdAcceptable ? 'Acceptable' : 'Weak',
+      supportsDirection: pdAcceptable,
       conflicts: pdConflicts,
     },
     marketPhase: {

@@ -92,7 +92,7 @@ async function initializeBackgroundServices(
       const existing = candleStore.getCandles(symbol, timeframe);
       const threshold = timeframe === '15m' ? 13 * 60 * 1000 : (timeframe === '1h' ? 55 * 60 * 1000 : 230 * 60 * 1000);
       const isFresh = candleStore.isFresh(symbol, timeframe, threshold);
-      if (existing.length >= 50 && (timeframe !== '15m' || isFresh)) {
+      if (existing.length >= 50 && timeframe !== '15m') {
         console.log(`[Startup] ${symbol} (${timeframe}) has ${existing.length} cached candles (fresh: ${isFresh}), using cache.`);
         continue;
       }
@@ -236,10 +236,17 @@ function clearCandidatePending(notifiedStore: NotifiedStore, item: QueuedSignalD
   if (item.candidate.dedupeKey) notifiedStore.clearPending(item.candidate.dedupeKey);
 }
 
-function bindHttpServer(listenPort: number): Promise<Server> {
+function bindHttpServer(listenPort: number, maxRetries = 10): Promise<Server> {
   return new Promise((resolve, reject) => {
     const server = app.listen(listenPort);
-    const onError = (error: Error) => reject(error);
+    const onError = (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE' && maxRetries > 0) {
+        console.warn(`[HTTP] Port ${listenPort} in use, retrying on ${listenPort + 1}...`);
+        resolve(bindHttpServer(listenPort + 1, maxRetries - 1));
+        return;
+      }
+      reject(error);
+    };
     server.once('error', onError);
     server.once('listening', () => {
       server.off('error', onError);
