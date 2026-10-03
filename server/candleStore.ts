@@ -150,6 +150,13 @@ export class CandleStore {
           ` | exit=${new Date(result.outcome.timestamp).toISOString()}`
         );
       }
+
+      try {
+        const { ShadowCohortTracker } = await import('./shadowCohortTracker');
+        ShadowCohortTracker.getInstance().process(symbol, candles as unknown as import('../src/types').Candle[]);
+      } catch (shadowErr) {
+        console.warn(`[ShadowCohortTracker] Failed for ${symbol}:`, shadowErr);
+      }
     } catch (error) {
       console.warn(`[OutcomeTracker] Processing failed for ${symbol}:`, error);
     }

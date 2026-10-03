@@ -30,6 +30,7 @@ import { isPoiInvalidated as evaluatePoiInvalidation } from '../src/poiValidity'
 import { SMC_ADMISSION_RULEBOOK_VERSION, getPoiTtlMs, getMinimumDisplacementGradePoints, getDistanceRule } from '../src/smcAdmissionRulebook';
 import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
 import { ActivePoiWatchlist } from './activePoiWatchlist';
+import { ShadowCohortTracker } from './shadowCohortTracker';
 
 export interface NotificationCandidate {
   symbol: Symbol;
@@ -421,6 +422,30 @@ export function runPipeline(
       stage: candidateEligible ? 'CANDIDATE' : gradeResult ? 'GRADED_REJECTED' : 'FILTER_REJECTED',
       setupQualityVersion: setupAssessmentV2?.decision.rulebookVersion ?? null,
     }));
+
+    try {
+      ShadowCohortTracker.getInstance().registerPoiCandidate({
+        symbol,
+        tradeDirection,
+        poiType,
+        zoneLow: zone.low,
+        zoneHigh: zone.high,
+        formedTimestamp,
+        observedTimestamp: candles15mCast[lastIndex15m].timestamp,
+        stage: candidateEligible ? 'CANDIDATE' : gradeResult ? 'GRADED_REJECTED' : 'FILTER_REJECTED',
+        grade: gradeResult?.grade ?? grade,
+        smcScore: gradeResult?.totalScore ?? null,
+        hasSweep: Boolean(modelState?.triggeringSweep),
+        sweepType: modelState?.triggeringSweep?.type ?? null,
+        blockingRules,
+        bias4H,
+        bias1H,
+        pd4H: pd4H?.status,
+        pd15M: pd15M?.status,
+      });
+    } catch {
+      // Safe fallback
+    }
 
     const isFatalRejection = blockingRules.some(r =>
       r === 'poi_expired_ttl_48h' ||
@@ -1028,6 +1053,30 @@ export function runPipeline(
         stage: 'CONSOLIDATED_REJECTED',
         setupQualityVersion: candidate.setupAssessmentV2?.decision.rulebookVersion ?? null,
       }));
+
+      try {
+        ShadowCohortTracker.getInstance().registerPoiCandidate({
+          symbol,
+          tradeDirection: candidate.tradeDirection,
+          poiType: candidate.poiType,
+          zoneLow: zone.low,
+          zoneHigh: zone.high,
+          formedTimestamp: candidate.poiFormedTimestamp,
+          observedTimestamp: candidate.marketDataTimestamp ?? candles15mCast[lastIndex15m].timestamp,
+          stage: 'CONSOLIDATED_REJECTED',
+          grade: candidate.gradeResult.grade,
+          smcScore: candidate.gradeResult.totalScore,
+          hasSweep: Boolean(candidate.modelState?.triggeringSweep),
+          sweepType: candidate.modelState?.triggeringSweep?.type ?? null,
+          blockingRules: ['poi_consolidation'],
+          bias4H: candidate.bias4H,
+          bias1H: candidate.bias1H,
+          pd4H: candidate.pd4H,
+          pd15M: candidate.pd15M,
+        });
+      } catch {
+        // Safe fallback
+      }
     }
   }
 }
