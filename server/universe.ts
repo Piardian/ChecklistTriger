@@ -49,6 +49,12 @@ export type UniverseCohort =
 
 export const UNIVERSE_VERSION = 'fx-metals-indices-crypto-v1' as const;
 
+export const BLACKLISTED_SYMBOLS: readonly string[] = ['GBPCHF'];
+
+export function isSymbolBlacklisted(symbol: string): boolean {
+  return BLACKLISTED_SYMBOLS.includes(symbol.toUpperCase());
+}
+
 export function universeCohort(symbol: Symbol): UniverseCohort {
   if ((CORE_UNIVERSE as readonly string[]).includes(symbol)) return 'CORE_UNIVERSE';
   if ((NEW_CROSS_UNIVERSE as readonly string[]).includes(symbol)) return 'NEW_CROSS_UNIVERSE';

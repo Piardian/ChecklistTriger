@@ -40,6 +40,7 @@ describe('historical market replay batch', () => {
       candidates: 0,
       takeProfit: 0,
       stopLoss: 0,
+      breakEven: 0,
       expired: 0,
       unresolved: 0,
       resolvedDirectionOutcomes: 0,

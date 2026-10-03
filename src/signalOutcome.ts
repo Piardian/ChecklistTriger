@@ -8,6 +8,7 @@ export type SignalOutcomeType =
   | 'ENTRY_TRIGGERED'
   | 'TAKE_PROFIT'
   | 'STOP_LOSS'
+  | 'BREAK_EVEN'
   | 'EXPIRED'
   | 'CANCELLED'
   | 'MANUAL_CANCELLED'
@@ -18,6 +19,7 @@ export type SignalOutcomeReasonCode =
   | 'ENTRY_ZONE_TRIGGERED'
   | 'TAKE_PROFIT_REACHED'
   | 'STOP_LOSS_REACHED'
+  | 'BREAK_EVEN_REACHED'
   | 'ENTRY_WINDOW_EXPIRED'
   | 'MAX_HOLD_EXPIRED'
   | 'SIGNAL_CANCELLED'
@@ -99,6 +101,8 @@ function defaultReason(outcomeType: SignalOutcomeType): SignalOutcomeReason {
       return { code: 'TAKE_PROFIT_REACHED', message: 'Take-profit condition was reached.' };
     case 'STOP_LOSS':
       return { code: 'STOP_LOSS_REACHED', message: 'Stop-loss condition was reached.' };
+    case 'BREAK_EVEN':
+      return { code: 'BREAK_EVEN_REACHED', message: 'Break-even condition was reached after moving stop to entry.' };
     case 'EXPIRED':
       return { code: 'ENTRY_WINDOW_EXPIRED', message: 'Signal expired before entry trigger.' };
     case 'CANCELLED':

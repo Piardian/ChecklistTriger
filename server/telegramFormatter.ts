@@ -95,7 +95,7 @@ export function buildDefaultExecutionView(candidate: NotificationCandidate): Exe
   });
 }
 
-import { formatPrice, calculateDistance } from '../src/assetMetrics';
+import { formatPrice, calculateDistance, getPipSize } from '../src/assetMetrics';
 
 export function extractCandidateDisplay(candidate: NotificationCandidate) {
   const { poiType, poi, tradeDirection, currentPrice } = candidate;
@@ -114,6 +114,36 @@ export function extractCandidateDisplay(candidate: NotificationCandidate) {
     ? 'Fiyat bölgede. 1 dakikalık LTF onay mumu gerekli (manuel onay / otomatik değil)'
     : 'Fiyat giriş bölgesinde değil. Önce bölgeye retest, ardından 1 dakikalık manuel onay.';
 
+  const pip = getPipSize(candidate.symbol);
+  const entryMidpoint = (zoneLow + zoneHigh) / 2;
+  const invalidationStop = tradeDirection === 'long' ? (zoneLow - pip) : (zoneHigh + pip);
+  const riskDist = Math.abs(entryMidpoint - invalidationStop);
+  const riskPips = Math.round((riskDist / pip) * 10) / 10;
+
+  const tp1Price = tradeDirection === 'long' ? (entryMidpoint + riskDist * 1.0) : (entryMidpoint - riskDist * 1.0);
+  const tp2Price = tradeDirection === 'long' ? (entryMidpoint + riskDist * 2.0) : (entryMidpoint - riskDist * 2.0);
+
+  let tp3Price = tradeDirection === 'long' ? (entryMidpoint + riskDist * 3.0) : (entryMidpoint - riskDist * 3.0);
+  let tp3Label = '3.0R Açık Likidite';
+
+  if (candidate.liquidityMagnet && candidate.liquidityMagnet.isActive) {
+    const isAhead = tradeDirection === 'long'
+      ? candidate.liquidityMagnet.priceLevel > entryMidpoint
+      : candidate.liquidityMagnet.priceLevel < entryMidpoint;
+    if (isAhead && riskDist > 0) {
+      tp3Price = candidate.liquidityMagnet.priceLevel;
+      const rMultiple = (Math.abs(tp3Price - entryMidpoint) / riskDist).toFixed(1);
+      tp3Label = `${candidate.liquidityMagnet.type} Mıknatısı (${rMultiple}R)`;
+    }
+  }
+
+  const stopLossText = tradeDirection === 'long'
+    ? `${formatPrice(invalidationStop, candidate.symbol)} (-1.0R / ${riskPips} pip risk - Bölge Altı)`
+    : `${formatPrice(invalidationStop, candidate.symbol)} (-1.0R / ${riskPips} pip risk - Bölge Üstü)`;
+  const tp1Text = `${formatPrice(tp1Price, candidate.symbol)} (+1.0R | Stop Maliyete / BE)`;
+  const tp2Text = `${formatPrice(tp2Price, candidate.symbol)} (+2.0R | Ana Hedef)`;
+  const tp3Text = `${formatPrice(tp3Price, candidate.symbol)} (${tp3Label})`;
+
   return Object.freeze({
     signalId,
     actionText,
@@ -121,10 +151,16 @@ export function extractCandidateDisplay(candidate: NotificationCandidate) {
     polarText,
     zoneHigh,
     zoneLow,
+    entryMidpoint,
+    invalidationStop,
+    tp1Price,
+    tp2Price,
+    tp3Price,
+    tp1Text,
+    tp2Text,
+    tp3Text,
     entryZoneText: `${formatPrice(zoneLow, candidate.symbol)} - ${formatPrice(zoneHigh, candidate.symbol)}`,
-    stopLossText: tradeDirection === 'long'
-      ? `Altı ${formatPrice(zoneLow, candidate.symbol)} - manuel onay`
-      : `Üstü ${formatPrice(zoneHigh, candidate.symbol)} - manuel onay`,
+    stopLossText,
     currentPriceText: formatPrice(currentPrice, candidate.symbol),
     distanceText: distInfo.displayText,
     requiredAction,

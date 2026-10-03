@@ -19,7 +19,8 @@ export class NotifiedStore {
   }
 
   hasDurablyBeenNotified(uniqueKey: string): boolean {
-    return this.readKeys().includes(uniqueKey);
+    const keys = this.readKeys();
+    return keys.includes(uniqueKey) || keys.includes(`INVALIDATED:${uniqueKey}`);
   }
 
   /**
@@ -55,6 +56,19 @@ export class NotifiedStore {
     if (uniqueKeys.some(key => this.hasBeenNotified(key))) return false;
     for (const key of uniqueKeys) this.pending.add(key);
     return true;
+  }
+
+  /**
+   * Marks a zone as permanently invalidated (e.g. completed candle closed beyond invalidation side)
+   * without marking its parent structural break as notified (so deeper unmitigated POIs from the same break remain valid).
+   */
+  markAsInvalidated(uniqueKey: string): void {
+    this.pending.delete(uniqueKey);
+    if (uniqueKey.startsWith('POI:') || uniqueKey.startsWith('INVALIDATED:')) {
+      this.markAsNotified(uniqueKey);
+      return;
+    }
+    this.markAsNotified(`INVALIDATED:${uniqueKey}`);
   }
 
   markAsNotified(uniqueKey: string): void {

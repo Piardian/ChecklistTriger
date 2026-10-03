@@ -534,6 +534,7 @@ function countOutcomes(records: readonly SignalRecord[]): Readonly<Record<Signal
       ENTRY_TRIGGERED: 0,
       TAKE_PROFIT: 0,
       STOP_LOSS: 0,
+      BREAK_EVEN: 0,
       EXPIRED: 0,
       CANCELLED: 0,
       MANUAL_CANCELLED: 0,

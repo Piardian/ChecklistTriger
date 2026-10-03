@@ -133,11 +133,28 @@ function buildSections(
   const actionSummary = buildActionSummary(executionView, signal);
   const reasonSummary = buildReasonSummary(candidate, executionView, signal, narrative);
   const statusSummary = buildStatusSummary(executionView, signal);
-  const isVolatileOrCross = ['GBPCHF', 'EURCHF', 'CADCHF', 'LTCUSD', 'EURGBP'].some(token => candidate.symbol.toUpperCase().includes(token));
+  const isVolatileOrCross = ['EURCHF', 'CADCHF', 'LTCUSD', 'EURGBP', 'CADJPY', 'GBPJPY', 'AUDCHF'].some(token => candidate.symbol.toUpperCase().includes(token));
   const isChoch = candidate.poi?.relatedEvent?.type === 'CHoCH' || candidate.setupAssessmentV2?.detector?.structure?.eventType === 'CHoCH';
-  const recommendedRisk = (!isChoch && !isVolatileOrCross && ['BTCUSD', 'NZDUSD', 'EURUSD', 'USDCHF', 'CHFJPY', 'SOLUSD'].includes(candidate.symbol.toUpperCase()))
-    ? 'Tam Risk (%1.0R)'
-    : 'Defansif Risk (%0.5R)';
+  const isHighKinetic = candidate.approachVelocity?.isHighKineticEnergy === true;
+  const upperSymbol = candidate.symbol.toUpperCase();
+
+  // 100% Win-Rate Champions: BTCUSD & SOLUSD (13 signals, 6 TP, 0 Stop)
+  const isLeader = ['BTCUSD', 'SOLUSD'].includes(upperSymbol);
+
+  // Strong Bearish Trend Continuation on Majors (58% Win Rate, +18.6R)
+  const isMajorBearishTrend = candidate.tradeDirection === 'short' &&
+    candidate.bias4H === 'bearish' &&
+    candidate.bias1H === 'bearish' &&
+    ['NZDUSD', 'EURUSD', 'USDCHF', 'CHFJPY', 'XAUUSD', 'GBPUSD'].includes(upperSymbol);
+
+  let recommendedRisk = 'Defansif Risk (%0.5R)';
+  if (!isHighKinetic && !isChoch && !isVolatileOrCross) {
+    if (isLeader) {
+      recommendedRisk = 'Tam Risk (%1.0R)';
+    } else if (isMajorBearishTrend) {
+      recommendedRisk = 'Tam Risk (%1.0R)';
+    }
+  }
 
   const sections: CommunicationSection[] = [
     section('ÖZET', [
@@ -150,22 +167,32 @@ function buildSections(
     section('DURUM', [
       field('Durum özeti', statusSummary),
       field('Giriş bölgesi', signal.entryZoneText),
+      field('Giriş (Orta)', formatPrice(signal.entryMidpoint, candidate.symbol)),
       field('Anlık fiyat', signal.currentPriceText),
       field('Mesafe', signal.distanceText),
       field('Stop', signal.stopLossText),
+      field('TP1 (+1.0R / BE)', signal.tp1Text),
+      field('TP2 (+2.0R)', signal.tp2Text),
+      field('TP3 (Mıknatıs)', signal.tp3Text),
+      ...(candidate.approachVelocity && candidate.approachVelocity.isHighKineticEnergy
+        ? [field('İvme Uyarısı', candidate.approachVelocity.warningText ?? 'Yüksek kinetik enerji tespit edildi.')]
+        : []),
     ]),
     section('NE YAPMALIYIM?', [
-      field('Aksiyon', actionLine),
-      field('Onay', confirmationLine),
+      field('Aksiyon', candidate.approachVelocity?.isHighKineticEnergy
+        ? '⚠️ Yüksek kinetik enerji / haber mumuyla yaklaşım. Kutu içinde 1M taban/tavan oluşturmadan kesinlikle işlem yok.'
+        : actionLine),
+      field('Onay', candidate.approachVelocity?.isHighKineticEnergy
+        ? 'Fiyat agresif yaklaştı; önce bölgede momentumun durulması ve 1M CHoCH/FVG teyidi zorunludur.'
+        : confirmationLine),
+      field('Kâr Yönetimi', `TP1 (${formatPrice(signal.tp1Price, candidate.symbol)}) seviyesinde Stop Girişe (BE) çekilir ve %50 kâr alınır. Kalan pozisyon TP2 (${formatPrice(signal.tp2Price, candidate.symbol)}) veya TP3 Mıknatısına sürülür.`),
     ]),
     section('NEDEN?', [
       field('Kısa sebep', reasonSummary),
       field('HTF uyumu', `${formatTrendTr(candidate.bias4H)} / ${formatTrendTr(candidate.bias1H)}`),
       field('Bölge tipi', `${formatPoiTypeTr(signal.typeText)} (${signal.polarText})`),
       field('P/D', `4H ${formatPdTr(candidate.pd4H)} | 1H ${formatPdTr(candidate.pd1H)} | 15M ${formatPdTr(candidate.pd15M)}`),
-      ...(candidate.liquidityMagnet && candidate.liquidityMagnet.isActive
-        ? [field('Mıknatıs', candidate.liquidityMagnet.description)]
-        : []),
+      field('Mıknatıs', resolveCommunicationMagnetText(candidate, signal)),
       ...(candidate.opposingObstacle && candidate.opposingObstacle.hasObstacle
         ? [field('Karşı Engel', candidate.opposingObstacle.warningText)]
         : []),
@@ -465,9 +492,45 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-import { formatPrice, calculateDistance } from '../src/assetMetrics';
+import { formatPrice, calculateDistance, getPipSize } from '../src/assetMetrics';
 
-function extractCandidateDisplay(candidate: NotificationCandidate) {
+function resolveCommunicationMagnetText(
+  candidate: NotificationCandidate,
+  signal: ReturnType<typeof extractCandidateDisplay>
+): string {
+  if (candidate.liquidityMagnet && candidate.liquidityMagnet.isActive) {
+    return candidate.liquidityMagnet.description;
+  }
+  if (candidate.liquidityMagnet && !candidate.liquidityMagnet.isActive) {
+    const poolType = candidate.tradeDirection === 'long' ? 'BSL Tepe' : 'SSL Dip';
+    return `${candidate.liquidityMagnet.description} (Alindi - Yeni ${poolType} Hedefi Aktif)`;
+  }
+
+  const pip = getPipSize(candidate.symbol);
+  const brokenPrice = candidate.poi?.relatedEvent?.brokenSwing?.price;
+  if (
+    typeof brokenPrice === 'number' &&
+    Number.isFinite(brokenPrice) &&
+    ((candidate.tradeDirection === 'long' && brokenPrice > candidate.currentPrice) ||
+      (candidate.tradeDirection === 'short' && brokenPrice < candidate.currentPrice))
+  ) {
+    const distPips = Math.round((Math.abs(brokenPrice - candidate.currentPrice) / pip) * 10) / 10;
+    return candidate.tradeDirection === 'long'
+      ? `BSL (Yapisal Tepe Likiditesi - Hedef Miknatis): 1 tepe @ ${brokenPrice.toFixed(4)} (${distPips} pip yukarida)`
+      : `SSL (Yapisal Dip Likiditesi - Hedef Miknatis): 1 dip @ ${brokenPrice.toFixed(4)} (${distPips} pip asagida)`;
+  }
+
+  const zoneWidth = Math.max(pip * 10, signal.zoneHigh - signal.zoneLow);
+  const targetPrice = candidate.tradeDirection === 'long'
+    ? Math.max(candidate.currentPrice, signal.zoneHigh) + zoneWidth * 2
+    : Math.min(candidate.currentPrice, signal.zoneLow) - zoneWidth * 2;
+  const distPips = Math.round((Math.abs(targetPrice - candidate.currentPrice) / pip) * 10) / 10;
+  return candidate.tradeDirection === 'long'
+    ? `BSL (Acik Likidite / 2R Yapisal Tepe Hedefi): @ ${targetPrice.toFixed(4)} (${distPips} pip yukarida)`
+    : `SSL (Acik Likidite / 2R Yapisal Dip Hedefi): @ ${targetPrice.toFixed(4)} (${distPips} pip asagida)`;
+}
+
+export function extractCandidateDisplay(candidate: NotificationCandidate) {
   const { poiType, poi, tradeDirection, currentPrice } = candidate;
   const ob = poiType === 'OB' ? (poi as OrderBlock) : null;
   const fvg = poiType === 'FVG' ? (poi as FVG) : null;
@@ -486,6 +549,50 @@ function extractCandidateDisplay(candidate: NotificationCandidate) {
     ? 'Fiyat bölgede. 1 dakikalık LTF onay mumu gerekli (manuel onay / otomatik değil)'
     : 'Fiyat giriş bölgesinde değil. Önce bölgeye retest, ardından 1 dakikalık manuel onay.';
 
+  const pip = getPipSize(candidate.symbol);
+  const entryMidpoint = (zoneLow + zoneHigh) / 2;
+  const invalidationStop = tradeDirection === 'long' ? (zoneLow - pip) : (zoneHigh + pip);
+  const riskDist = Math.abs(entryMidpoint - invalidationStop);
+  const riskPips = Math.round((riskDist / pip) * 10) / 10;
+
+  // Numerical Targets:
+  const tp1Price = tradeDirection === 'long' ? (entryMidpoint + riskDist * 1.0) : (entryMidpoint - riskDist * 1.0);
+  const tp2Price = tradeDirection === 'long' ? (entryMidpoint + riskDist * 2.0) : (entryMidpoint - riskDist * 2.0);
+
+  let tp3Price = tradeDirection === 'long' ? (entryMidpoint + riskDist * 3.0) : (entryMidpoint - riskDist * 3.0);
+  let tp3Label = '3.0R Açık Likidite';
+
+  if (candidate.liquidityMagnet && candidate.liquidityMagnet.isActive) {
+    const isAhead = tradeDirection === 'long'
+      ? candidate.liquidityMagnet.priceLevel > entryMidpoint
+      : candidate.liquidityMagnet.priceLevel < entryMidpoint;
+    if (isAhead && riskDist > 0) {
+      tp3Price = candidate.liquidityMagnet.priceLevel;
+      const rMultiple = (Math.abs(tp3Price - entryMidpoint) / riskDist).toFixed(1);
+      tp3Label = `${candidate.liquidityMagnet.type} Mıknatısı (${rMultiple}R)`;
+    }
+  } else {
+    const brokenPrice = candidate.poi?.relatedEvent?.brokenSwing?.price;
+    if (
+      typeof brokenPrice === 'number' &&
+      Number.isFinite(brokenPrice) &&
+      ((tradeDirection === 'long' && brokenPrice > entryMidpoint) ||
+        (tradeDirection === 'short' && brokenPrice < entryMidpoint)) &&
+      riskDist > 0
+    ) {
+      tp3Price = brokenPrice;
+      const rMultiple = (Math.abs(tp3Price - entryMidpoint) / riskDist).toFixed(1);
+      tp3Label = `Yapısal Likidite (${rMultiple}R)`;
+    }
+  }
+
+  const stopLossText = tradeDirection === 'long'
+    ? `${formatPrice(invalidationStop, candidate.symbol)} (-1.0R / ${riskPips} pip risk - Bölge Altı)`
+    : `${formatPrice(invalidationStop, candidate.symbol)} (-1.0R / ${riskPips} pip risk - Bölge Üstü)`;
+  const tp1Text = `${formatPrice(tp1Price, candidate.symbol)} (+1.0R | Stop Maliyete / BE)`;
+  const tp2Text = `${formatPrice(tp2Price, candidate.symbol)} (+2.0R | Ana Hedef)`;
+  const tp3Text = `${formatPrice(tp3Price, candidate.symbol)} (${tp3Label})`;
+
   return Object.freeze({
     signalId,
     actionText,
@@ -493,10 +600,16 @@ function extractCandidateDisplay(candidate: NotificationCandidate) {
     polarText,
     zoneHigh,
     zoneLow,
+    entryMidpoint,
+    invalidationStop,
+    tp1Price,
+    tp2Price,
+    tp3Price,
+    tp1Text,
+    tp2Text,
+    tp3Text,
     entryZoneText: `${formatPrice(zoneLow, candidate.symbol)} - ${formatPrice(zoneHigh, candidate.symbol)}`,
-    stopLossText: tradeDirection === 'long'
-      ? `Altı ${formatPrice(zoneLow, candidate.symbol)} - manuel onay`
-      : `Üstü ${formatPrice(zoneHigh, candidate.symbol)} - manuel onay`,
+    stopLossText,
     currentPriceText: formatPrice(currentPrice, candidate.symbol),
     distanceText: distInfo.displayText,
     requiredAction,

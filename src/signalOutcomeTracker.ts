@@ -44,6 +44,7 @@ export interface OutcomeTrackerOptions {
   readonly stateFile?: string;
   readonly entryMode?: 'midpoint' | 'zone_touch';
   readonly includePricePath?: boolean;
+  readonly breakEvenTriggerR?: number;
 }
 
 interface PersistedTrackedSignal {
@@ -166,6 +167,8 @@ export function evaluateOutcome(
   const entryCandle = future[entryIndex];
   let mfe = 0;
   let mae = 0;
+  let breakEvenArmed = false;
+  const breakEvenTriggerR = options.breakEvenTriggerR;
   // The entry candle establishes the first touch of the entry price, but its
   // OHLC does not reveal what happened before versus after that touch. Exclude
   // it from TP/SL evaluation and excursion measurement to avoid look-ahead.
@@ -182,9 +185,11 @@ export function evaluateOutcome(
     mfe = Math.max(mfe, favorable);
     mae = Math.max(mae, adverse);
 
+    const effectiveStopPrice = breakEvenArmed ? plan.entryPrice : plan.stopPrice;
+
     const hitStop = candidate.tradeDirection === 'long'
-      ? candle.low <= plan.stopPrice
-      : candle.high >= plan.stopPrice;
+      ? candle.low <= effectiveStopPrice
+      : candle.high >= effectiveStopPrice;
     const hitTarget = candidate.tradeDirection === 'long'
       ? candle.high >= plan.targetPrice
       : candle.low <= plan.targetPrice;
@@ -199,23 +204,31 @@ export function evaluateOutcome(
         ? buildEvaluatedPricePath(future.slice(0, exitIndex + 1), plan, candidate.tradeDirection, entryIndex)
         : undefined;
 
+      const isBreakEven = breakEvenArmed;
+      const outcomeType = isBreakEven ? 'BREAK_EVEN' : 'STOP_LOSS';
+      const rrAchieved = isBreakEven ? 0 : -1;
+      const reasonCode = isBreakEven ? 'BREAK_EVEN_REACHED' : 'STOP_LOSS_REACHED';
+      const reasonMessage = isBreakEven
+        ? 'Trade reached +1.0R and stop was moved to break-even before price retraced.'
+        : 'Stop level was reached by subsequent market data. Same-candle conflicts resolve to STOP_LOSS_FIRST.';
+
       return completedResult(
         plan,
         startTimestamp,
         plan,
         createSignalOutcome({
           signalContext: requireSignalContext(candidate),
-          outcomeType: 'STOP_LOSS',
+          outcomeType,
           timestamp: candle.timestamp,
           reason: {
-            code: 'STOP_LOSS_REACHED',
-            message: 'Stop level was reached by subsequent market data. Same-candle conflicts resolve to STOP_LOSS_FIRST.',
+            code: reasonCode,
+            message: reasonMessage,
           },
         }),
         entryCandle.timestamp,
         plan.entryPrice,
-        plan.stopPrice,
-        -1,
+        effectiveStopPrice,
+        rrAchieved,
         mfe,
         mae,
         evaluatedCandles,
@@ -257,6 +270,13 @@ export function evaluateOutcome(
         exitIndex,
         pricePath
       );
+    }
+
+    // Arm break-even for subsequent candles if favorable excursion reached the trigger threshold
+    if (breakEvenTriggerR !== undefined && breakEvenTriggerR !== null && plan.riskDistance > 0) {
+      if ((favorable / plan.riskDistance) >= breakEvenTriggerR) {
+        breakEvenArmed = true;
+      }
     }
   }
 

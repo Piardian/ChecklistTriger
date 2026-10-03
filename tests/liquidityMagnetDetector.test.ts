@@ -1,4 +1,4 @@
-import { detectLiquidityMagnet } from '../src/liquidityMagnetDetector';
+import { detectLiquidityMagnet, resolveDisplayLiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { SwingPoint } from '../src/types';
 
 describe('Liquidity Magnet Detector (EQH / EQL)', () => {
@@ -91,5 +91,21 @@ describe('Liquidity Magnet Detector (EQH / EQL)', () => {
 
     const magnet = detectLiquidityMagnet(swings, currentPrice, 'long', 'EURUSD');
     expect(magnet).toBeNull();
+  });
+
+  it('resolves nearest active single swing low (SSL) when EQL cluster is absent or taken (EURJPY #70 scenario)', () => {
+    const swings: SwingPoint[] = [
+      { type: 'low', price: 177.3411, formedAtIndex: 10, confirmedAtIndex: 12, timestamp: 1000 },
+      { type: 'low', price: 177.8585, formedAtIndex: 15, confirmedAtIndex: 17, timestamp: 2000 },
+      { type: 'low', price: 178.0322, formedAtIndex: 20, confirmedAtIndex: 22, timestamp: 3000 },
+    ];
+    const magnet = resolveDisplayLiquidityMagnet(swings, 178.460, 'short', 'EURJPY');
+
+    expect(magnet).not.toBeNull();
+    expect(magnet?.isActive).toBe(true);
+    expect(magnet?.pointsCount).toBe(1);
+    expect(magnet?.priceLevel).toBeCloseTo(178.0322, 4);
+    expect(magnet?.description).toContain('SSL (Tekil Dip Likiditesi - Hedef Miknatis)');
+    expect(magnet?.description).toContain('Ana Dip: 177.3411');
   });
 });

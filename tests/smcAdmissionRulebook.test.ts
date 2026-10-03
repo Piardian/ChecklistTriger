@@ -29,13 +29,13 @@ describe('SMC admission rulebook', () => {
   });
 
   it('preserves current box-width policy through the rulebook', () => {
-    expect(getMinimumBoxSize('EURUSD')).toEqual({ minUnits: 2.8 });
-    expect(getMinimumBoxSize('CADUSD')).toEqual({ minUnits: 5.0 });
-    expect(getMinimumBoxSize('EURJPY')).toEqual({ minUnits: 5.0 });
-    expect(getMinimumBoxSize('USDJPY')).toEqual({ minUnits: 4.0 });
+    expect(getMinimumBoxSize('EURUSD')).toEqual({ minUnits: 7.0 });
+    expect(getMinimumBoxSize('CADUSD')).toEqual({ minUnits: 7.0 });
+    expect(getMinimumBoxSize('EURJPY')).toEqual({ minUnits: 7.0 });
+    expect(getMinimumBoxSize('USDJPY')).toEqual({ minUnits: 7.0 });
     expect(getMinimumBoxSize('XAUUSD')).toEqual({ minUnits: 25.0 });
     expect(getMinimumBoxSize('BTCUSD')).toEqual({ minUnits: 50.0, minPercent: 0.06 });
-    expect(getMinimumBoxSize('ETHUSD')).toEqual({ minUnits: 0, minPercent: 0.25 });
+    expect(getMinimumBoxSize('ETHUSD')).toEqual({ minUnits: 0, minPercent: 0.35 });
     expect(getMinimumBoxSize('NAS100')).toEqual({ minUnits: 2.0, minPercent: 0.15 });
   });
 });

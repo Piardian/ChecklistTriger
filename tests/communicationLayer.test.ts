@@ -24,6 +24,7 @@ describe('Communication Layer', () => {
     expect(bundle.decisionLog.channel).toBe('Telegram');
     expect(bundle.decisionLog.appliedMode).toBe('Balanced');
     expect(bundle.renderedText).toContain('SİNYAL ÖZETİ');
+    expect(bundle.renderedText).toContain('Mıknatıs              :');
     expect(bundle.renderedText).not.toContain('Quality Score');
     expect(bundle.renderedText).not.toContain('EXPLAINABILITY BLOCK');
   });

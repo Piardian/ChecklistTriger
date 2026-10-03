@@ -215,16 +215,20 @@ export class DeterministicProviderQueue {
         const errMsg = error instanceof Error ? error.message : String(error);
         const lowerMsg = errMsg.toLowerCase();
         const isDailyLimit = lowerMsg.includes('for the day') || lowerMsg.includes('daily');
-        const retryAfter = error instanceof ProviderRateLimitError ? error.retryAfterMs : null;
+        const isRateLimit = error instanceof ProviderRateLimitError || isDailyLimit;
         const nowMs = this.now();
-        const minuteBoundaryWaitMs = minuteWindowStart(nowMs) + 60_000 - nowMs + this.windowBufferMs;
-        const cooldownDuration = isDailyLimit ? 3600_000 : (retryAfter ?? minuteBoundaryWaitMs);
-        this.keyWindows[keyIdx].cooldownUntilMs = nowMs + cooldownDuration;
 
-        const nextAvailableIdx = this.keyWindows.findIndex((kw, i) => i !== keyIdx && this.now() >= kw.cooldownUntilMs);
-        if (nextAvailableIdx !== -1 && this.keyCount > 1) {
-          currentKeyIndex = nextAvailableIdx;
-          continue;
+        if (isRateLimit) {
+          const retryAfter = error instanceof ProviderRateLimitError ? error.retryAfterMs : null;
+          const minuteBoundaryWaitMs = minuteWindowStart(nowMs) + 60_000 - nowMs + this.windowBufferMs;
+          const cooldownDuration = isDailyLimit ? 3600_000 : (retryAfter ?? minuteBoundaryWaitMs);
+          this.keyWindows[keyIdx].cooldownUntilMs = nowMs + cooldownDuration;
+
+          const nextAvailableIdx = this.keyWindows.findIndex((kw, i) => i !== keyIdx && this.now() >= kw.cooldownUntilMs);
+          if (nextAvailableIdx !== -1 && this.keyCount > 1) {
+            currentKeyIndex = nextAvailableIdx;
+            continue;
+          }
         }
 
         const allInLongCooldown = this.keyWindows.every(kw => kw.cooldownUntilMs - nowMs > 120_000);

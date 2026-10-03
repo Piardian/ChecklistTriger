@@ -1311,6 +1311,54 @@ Bu bölüm, sistemin erken döneminde üretilen ve loglardan çıkarılan işlem
   - **Soru 4 (Sonuç):** [D] İşlem alınmadı (Korundu / 0$ Kayıp)
   - **Soru 5 (Stop/İptal Nedeni):** [D] 1M onay mekanizması korudu (Kutu ilk temasta tüketilmişti)
 
+### 69. [2026-09-30 15:15 TSİ / 12:15 UTC] — SOLUSD (15M OB - SAT)
+
+- **Kaynak:** Telegram Sinyali (`SOLUSD 15M OB SAT`)
+- **Bot Puanı:** Grade A+ (9/9 — Tam Puan / Elit) | **Önerilen Risk:** Defansif Risk (%0.5R) | **Uygulanan Risk:** %1.0 Risk (1.0R)
+- **Giriş Bölgesi:** 120.34 - 120.93 | **Anlık Fiyat:** 119.69 (0.7 USD / %0.54 bölgenin altında) | **Stop:** 120.93 üstü (manuel onay)
+- **Durum:** 🎯 **TAKE PROFIT (+2.0R / +2.000 $ @ %1 Risk)** — Operatör bildirimi: *"30 eylül 15.15 işlemi tp oldu %1 risk 2 rr tp"*. Fiyat 119.69 seviyesinden 120.34 - 120.93 aralığındaki 15M Bearish OB kutusuna geri çekilmiş (retest), 1 dakikalık manuel onay (1M CHoCH) verdikten sonra %1 tam risk ile işleme girilmiş ve aşağıdaki 5'li EQL (`119.1980`) likidite mıknatısını süpürerek net **2 RR (+2.0R)** kârla hedefe ulaşmıştır.
+- **SMC Bağlamı & Neden Kusursuz Çalıştı?:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı` — Çift zaman dilimi tam ayı trendi uyumu.
+  - **P/D Durumu (Üçlü Premium Hizalanması):** `4H: Pahalı | 1H: Pahalı | 15M: Pahalı` — Tüm zaman dilimlerinde (4H, 1H, 15M) kusursuz **Pahalı (Premium)** dizilimi.
+  - **Anlatı Kalitesi (4/4 Güçlü — Elit):** `Bağlam: Güçlü | Likidite: Güçlü | Reaksiyon: Güçlü | Devam: Güçlü | Genel: Elit`.
+  - **Bölge Türü:** 15M Bearish Order Block (`0.59 USD` genişlik).
+  - **Likidite Mıknatısı:** EQL (Eşit Dipler - SSL Mıknatısı): **5 dip @ 119.1980** (49.2 pip aşağıda güçlü satıcı likidite havuzu).
+  - **Karşı Engel:** Yok (Hedef yolunda karşı 15M Bullish OB/FVG engeli bulunmaması fiyatın hedefe engelsiz akmasını sağladı).
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** [A] Sakin düzeltme / Kutuya retest (`120.34 - 120.93`)
+  - **Soru 2 (1M Formasyonu):** [A] 1M CHoCH/BOS kırılımı (1M manuel onay alındı)
+  - **Soru 3 (Giriş Kararı):** [A] 1M FVG/OB retesti (%1 Risk ile giriş)
+  - **Soru 4 (Sonuç):** [A] TP (**+2.0R / 2 RR TP**)
+  - **Soru 5 (Stop/İptal Nedeni):** [D] Yok (Hedefe ulaştı)
+
+### 70. [2026-09-30 18:01 TSİ / 15:01 UTC] — EURJPY (15M OB - SAT)
+
+- **Kaynak:** Telegram Sinyali (`signalId: EURJPY_15m_OB_1790664300000_1790666100000`) & 1 Ekran Görüntüsü (15M Kurulum)
+- **Bot Puanı:** Grade A (7/9) | **Önerilen Risk:** Defansif Risk (%0.5R)
+- **Giriş Bölgesi:** 178.846 - 178.920 | **Anlık Fiyat:** 178.460 (38.6 point bölgenin altında) | **Stop:** 178.920 üstü (manuel onay)
+- **Durum:** ⏳ **BEKLEMEDE (24 Saatlik Eski POI — Kutuya 38.6 Point Mesafede)** — Operatör notu: *"çizimler gelmedi yalnız bu çizim var, mıknatıs vs. hiçbiri yazılmamış ben anlamadım bu nasıl işlem acaba eski motordan mı kalma bakar mısın, 30 eylül 18.01 işlemi"*.
+- **Telemetri & Kod Otopsisi (3 Kritik Sorunun Cevabı):**
+  1. **Eski Motordan mı Kalma? -> Hayır, Yeni Motordan (`swing-bos-core`), Ancak 24 Saat Önceki POI:**
+     - Telemetri kaydı (`EURJPY_15m_OB_1790664300000_1790666100000`), bu OB'nin **29 Eylül 14:45 UTC (17:45 TSİ)** mumunda oluştuğunu ve **29 Eylül 15:15 UTC (18:15 TSİ)** mumunda BOS kırdığını göstermektedir (grafiğin en sol ucundaki sarı kutu).
+     - Kutu 30 Eylül boyunca saat `09:45`, `10:00`, `11:00`, `11:15` ve `12:30 UTC` taramalarında `"4H premium/discount context conflicts with the trade"` nedeniyle bloklanmış; ancak saat **15:00 UTC (18:00 TSİ)** kapanışında fiyat `178.460`'a çıkıp `4H Pahalı` bölgesine adım atınca 24 saatlik eski kutu `PASS` alarak bildirim olarak düşmüştür.
+  2. **Neden Sadece 15M Çizimi Geldi (`1H` ve `1M` Yok)? -> 30 Saniye MTF Timeout Fallback (✅ GİDERİLDİ):**
+     - `delivery-queue.jsonl` ve `screenshot.jsonl` loglarında teslimatın **41.5 saniye (`41574 ms`)** sürdüğü kayıtlıdır. `signalDeliveryProcessor.ts` içinde `1m` mumlarını çeken `loadExecutionCandles1m`, saat başı (`15:00 UTC`) TwelveData rate-limit kuyruğunda **30.0 saniye** beklediği için `30000 ms` MTF timeout sınırına takılmış ve yalnızca **15M grafiğini** göndermiştir.
+     - **Uygulanan Kalıcı Çözüm (`signalDeliveryProcessor.ts`):** MTF ekran görüntüsü zaman aşımı **30 saniyeden 90 saniyeye (`90000 ms`)** çıkarıldı; `loadExecutionCandles1m` fonksiyonuna **65 saniye** izole timeout + yerel `candleStore` fallback eklendi ve herhangi bir `1m` gecikmesinde **`1H HTF`** grafiğinin bağımsız olarak yine de çizilip Telegram'a iletilmesi garanti altına alındı.
+  3. **Neden `Mıknatıs` Yazılmamış? -> Tekil Swing Havuzu Fallback Eksikliği & Koşullu Gizleme (✅ GİDERİLDİ):**
+     - `178.460` altında `3.5 pip` tolerans içindeki eski üçlü dip (`178.4184`) daha önce süpürüldüğü (`status: 'TAKEN'`) ve aktif dipler (`178.0322`, `177.8585`, `177.3411`) tekil kademeli swing dipleri olduğu için `liquidityMagnet.isActive === false` dönmüş ve `communicationLayer.ts` satırı gizlemişti.
+     - **Uygulanan Kalıcı Çözüm (`liquidityMagnetDetector.ts`, `pipeline.ts`, `communicationLayer.ts`):** `resolveDisplayLiquidityMagnet` eklendi; 15M'de aktif `EQH`/`EQL` yoksa sırasıyla **1H aktif `EQH`/`EQL`**, **15M aktif tekil Swing Likiditesi (`SSL`/`BSL`)** ve **1H tekil Swing Likiditesi** otomatik çözümleniyor (Grade puanlamasındaki `+1` bonus yalnızca `pointsCount >= 2` olan gerçek `EQH`/`EQL` kümelerine verilmeye devam ediyor). Ayrıca `communicationLayer.ts` içinde `Mıknatıs` satırı her koşulda (`NEDEN?` bloğunda) zorunlu hale getirildi.
+- **SMC Bağlamı:**
+  - **HTF Trend Uyumu:** `4H: Aşağı | 1H: Aşağı`
+  - **P/D Durumu:** `4H: Pahalı | 1H: Pahalı | 15M: Pahalı`
+  - **Bölge Türü:** 15M Bearish Order Block (`7.4 point` genişlik, 24 saatlik).
+  - **Likidite Mıknatısı (Çözümlenen):** `SSL (Tekil Dip Likiditesi - Hedef Mıknatıs): 1 dip @ 178.0322 (42.8 pip aşağıda) | Ana Dip: 177.3411`
+- **1M Benchmark Değerlendirmesi:**
+  - **Soru 1 (Kutuya Yaklaşım):** [C] Kutuya ulaşmadı (Fiyat 38.6 point aşağıda / Beklemede)
+  - **Soru 2 (1M Formasyonu):** ⏳ Beklemede (Kutuya henüz temas etmedi)
+  - **Soru 3 (Giriş Kararı):** [C] Girmedim (Pas / Retest ve 1M teyidi bekleniyor)
+  - **Soru 4 (Sonuç):** ⏳ Beklemede (`PENDING`)
+  - **Soru 5 (Stop/İptal Nedeni):** ⏳ Beklemede / Tetiklenmedi
+
 ---
 
 ## 📋 STANDART 1M BENCHMARK DOĞRULAMA ANKETİ (HAFTALIK DEĞERLENDİRME ŞABLONU)

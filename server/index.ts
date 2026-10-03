@@ -12,6 +12,7 @@ import { createSignalDeliveryProcessor } from './signalDeliveryProcessor';
 import { probeTelegramConnection } from './telegramSender';
 import { acquireRuntimeInstanceLock, RuntimeInstanceLock } from './runtimeInstanceLock';
 import { evaluateHardMarketWindow } from './killzone';
+import { ActivePoiWatchlist } from './activePoiWatchlist';
 
 const port = environmentInteger('PORT', 3000);
 const symbols: Symbol[] = [...ALL_SYMBOLS];
@@ -157,7 +158,24 @@ async function executeAlignedPollingCycle(
 
   console.log(`[Scheduler] ${now.toISOString()} - Executing aligned polling cycle (4h=${is4HourClose}, 1h=${isHourClose}, 15m=true)...`);
 
-  for (const symbol of symbols) {
+  try {
+    ActivePoiWatchlist.getInstance().prune();
+  } catch {
+    // Non-blocking prune
+  }
+  const watchlistSymbols = ActivePoiWatchlist.getInstance().getActiveSymbols();
+  if (watchlistSymbols.length > 0) {
+    console.log(`[Scheduler] 🎯 Active POI Watchlist Symbols: [${watchlistSymbols.join(', ')}]`);
+  }
+
+  // Prioritize symbols with active unmitigated POIs awaiting retest
+  const prioritizedSymbols = [...symbols].sort((a, b) => {
+    const aWatch = watchlistSymbols.includes(a) ? 1 : 0;
+    const bWatch = watchlistSymbols.includes(b) ? 1 : 0;
+    return bWatch - aWatch;
+  });
+
+  for (const symbol of prioritizedSymbols) {
     const marketWindow = evaluateHardMarketWindow(now, symbol);
     if (!marketWindow.active) {
       // Market closed -> skip TwelveData call to preserve API credits

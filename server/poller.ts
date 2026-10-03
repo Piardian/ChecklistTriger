@@ -29,6 +29,7 @@ import type { SignalDeliveryQueue } from './signalDeliveryQueue';
 
 import { evaluateKillzoneFilter } from './killzone';
 import { SetupFamilyGuard } from './setupFamilyGuard';
+import { ActivePoiWatchlist } from './activePoiWatchlist';
 
 const signalIntelligenceSnapshotWriter = new FileSignalIntelligenceSnapshotWriter();
 const signalRepository = new InMemorySignalRepository();
@@ -794,9 +795,25 @@ function clearCandidatePending(store: NotifiedStore, candidate: NotificationCand
   if (candidate.dedupeKey) store.clearPending(candidate.dedupeKey);
 }
 
+function markCandidateAsInvalidated(store: NotifiedStore, candidate: NotificationCandidate): void {
+  clearCandidatePending(store, candidate);
+  store.markAsInvalidated(candidate.uniqueKey);
+  if (candidate.dedupeKey) store.markAsInvalidated(candidate.dedupeKey);
+  try {
+    ActivePoiWatchlist.getInstance().markPoiInvalidated(candidate.symbol, candidate.dedupeKey ?? candidate.uniqueKey);
+  } catch {
+    // Non-blocking watchlist update
+  }
+}
+
 function markCandidateAsNotified(store: NotifiedStore, candidate: NotificationCandidate): void {
   store.markAsNotified(candidate.uniqueKey);
   if (candidate.dedupeKey) store.markAsNotified(candidate.dedupeKey);
+  try {
+    ActivePoiWatchlist.getInstance().markPoiTested(candidate.symbol, candidate.dedupeKey ?? candidate.uniqueKey);
+  } catch {
+    // Non-blocking watchlist update
+  }
 }
 
 async function loadExecutionCandles1m(symbol: Symbol, candleStore: CandleStore): Promise<import('./candleStore').StoredCandle[]> {

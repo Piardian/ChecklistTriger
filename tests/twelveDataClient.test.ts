@@ -19,6 +19,10 @@ describe('Twelve Data Client', () => {
       TWELVE_DATA_RATE_LIMIT_SAFETY_MARGIN: '0',
       TWELVE_DATA_REQUEST_TIMEOUT_MS: '1000',
     };
+    for (let i = 2; i <= 20; i++) {
+      delete process.env[`TWELVE_DATA_API_KEY_${i}`];
+    }
+    delete process.env.TWELVE_DATA_API_KEYS;
     resetTwelveDataProviderQueueForTests();
   });
 

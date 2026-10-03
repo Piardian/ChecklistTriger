@@ -28,6 +28,7 @@ export interface HistoricalMarketReplayBatchAggregate {
   readonly candidates: number;
   readonly takeProfit: number;
   readonly stopLoss: number;
+  readonly breakEven?: number;
   readonly expired: number;
   readonly unresolved: number;
   readonly resolvedDirectionOutcomes: number;
@@ -90,9 +91,10 @@ function aggregateResults(
   const trades = results.flatMap(result => result.session.trades);
   const takeProfit = trades.filter(trade => trade.outcomeStatus === 'TAKE_PROFIT').length;
   const stopLoss = trades.filter(trade => trade.outcomeStatus === 'STOP_LOSS').length;
+  const breakEven = trades.filter(trade => trade.outcomeStatus === 'BREAK_EVEN').length;
   const expired = trades.filter(trade => trade.outcomeStatus === 'EXPIRED').length;
   const unresolved = trades.filter(trade => trade.outcomeStatus === 'UNRESOLVED').length;
-  const resolvedDirectionOutcomes = takeProfit + stopLoss;
+  const resolvedDirectionOutcomes = takeProfit + stopLoss + breakEven;
 
   return {
     symbolsAttempted: results.length,
@@ -101,6 +103,7 @@ function aggregateResults(
     candidates: trades.length,
     takeProfit,
     stopLoss,
+    breakEven,
     expired,
     unresolved,
     resolvedDirectionOutcomes,

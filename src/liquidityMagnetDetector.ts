@@ -108,6 +108,105 @@ export function detectLiquidityMagnet(
   return null;
 }
 
+export function resolveDisplayLiquidityMagnet(
+  swings15m: readonly SwingPoint[],
+  currentPrice: number,
+  tradeDirection: 'long' | 'short',
+  symbol: string,
+  candles15m?: readonly { high: number; low: number; timestamp: number }[],
+  currentIndex15m?: number,
+  swings1h?: readonly SwingPoint[],
+  candles1h?: readonly { high: number; low: number; timestamp: number }[],
+  currentIndex1h?: number
+): LiquidityMagnet | null {
+  const magnet15m = detectLiquidityMagnet(swings15m, currentPrice, tradeDirection, symbol, candles15m, currentIndex15m);
+  if (magnet15m && magnet15m.isActive) {
+    return magnet15m;
+  }
+
+  if (swings1h && swings1h.length >= 2) {
+    const magnet1h = detectLiquidityMagnet(swings1h, currentPrice, tradeDirection, symbol, candles1h, currentIndex1h);
+    if (magnet1h && magnet1h.isActive) {
+      return {
+        ...magnet1h,
+        description: `${magnet1h.description} [1H]`,
+      };
+    }
+  }
+
+  const single15m = detectNearestActiveSwingMagnet(swings15m, currentPrice, tradeDirection, symbol, candles15m, currentIndex15m);
+  if (single15m) {
+    return single15m;
+  }
+
+  if (swings1h && swings1h.length > 0) {
+    const single1h = detectNearestActiveSwingMagnet(swings1h, currentPrice, tradeDirection, symbol, candles1h, currentIndex1h, ' [1H]');
+    if (single1h) {
+      return single1h;
+    }
+  }
+
+  return magnet15m;
+}
+
+function detectNearestActiveSwingMagnet(
+  swings: readonly SwingPoint[],
+  currentPrice: number,
+  tradeDirection: 'long' | 'short',
+  symbol: string,
+  candles?: readonly { high: number; low: number; timestamp: number }[],
+  currentIndex?: number,
+  tfSuffix = ''
+): LiquidityMagnet | null {
+  if (!swings || swings.length === 0) return null;
+  const pip = getPipSize(symbol);
+
+  if (tradeDirection === 'long') {
+    const activeHighs = swings
+      .filter(s => s.type === 'high' && s.price > currentPrice)
+      .filter(s => findTakenAt('EQH', s.price, [s], candles, currentIndex) === null)
+      .sort((a, b) => a.price - b.price);
+
+    if (activeHighs.length === 0) return null;
+    const nearest = activeHighs[0];
+    const extreme = activeHighs[activeHighs.length - 1];
+    const distancePips = Math.round(((nearest.price - currentPrice) / pip) * 10) / 10;
+    const majorSuffix = extreme.price > nearest.price ? ` | Ana Tepe: ${extreme.price.toFixed(4)}` : '';
+    return {
+      type: 'EQH',
+      priceLevel: nearest.price,
+      pointsCount: 1,
+      distancePips,
+      isActive: true,
+      status: 'ACTIVE',
+      firstTakenAt: null,
+      sourceSwingTimestamps: [nearest.timestamp],
+      description: `BSL (Tekil Tepe Likiditesi - Hedef Miknatis): 1 tepe @ ${nearest.price.toFixed(4)} (${distancePips} pip yukarida)${majorSuffix}${tfSuffix}`,
+    };
+  }
+
+  const activeLows = swings
+    .filter(s => s.type === 'low' && s.price < currentPrice)
+    .filter(s => findTakenAt('EQL', s.price, [s], candles, currentIndex) === null)
+    .sort((a, b) => b.price - a.price);
+
+  if (activeLows.length === 0) return null;
+  const nearest = activeLows[0];
+  const extreme = activeLows[activeLows.length - 1];
+  const distancePips = Math.round(((currentPrice - nearest.price) / pip) * 10) / 10;
+  const majorSuffix = extreme.price < nearest.price ? ` | Ana Dip: ${extreme.price.toFixed(4)}` : '';
+  return {
+    type: 'EQL',
+    priceLevel: nearest.price,
+    pointsCount: 1,
+    distancePips,
+    isActive: true,
+    status: 'ACTIVE',
+    firstTakenAt: null,
+    sourceSwingTimestamps: [nearest.timestamp],
+    description: `SSL (Tekil Dip Likiditesi - Hedef Miknatis): 1 dip @ ${nearest.price.toFixed(4)} (${distancePips} pip asagida)${majorSuffix}${tfSuffix}`,
+  };
+}
 
 function selectBestMagnet(candidates: readonly LiquidityMagnet[]): LiquidityMagnet | null {
   if (candidates.length === 0) return null;

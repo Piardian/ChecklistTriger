@@ -23,6 +23,7 @@ export type HistoricalMarketReplayStatus = 'EMPTY' | 'COMPLETED';
 export type HistoricalReplayOutcomeStatus =
   | 'TAKE_PROFIT'
   | 'STOP_LOSS'
+  | 'BREAK_EVEN'
   | 'EXPIRED'
   | 'UNRESOLVED';
 
@@ -322,9 +323,11 @@ function createReplayTrade(
         ? 'TAKE_PROFIT'
         : outcome.outcome.outcomeType === 'STOP_LOSS'
           ? 'STOP_LOSS'
-          : outcome.outcome.outcomeType === 'EXPIRED'
-            ? 'EXPIRED'
-            : 'UNRESOLVED';
+          : outcome.outcome.outcomeType === 'BREAK_EVEN'
+            ? 'BREAK_EVEN'
+            : outcome.outcome.outcomeType === 'EXPIRED'
+              ? 'EXPIRED'
+              : 'UNRESOLVED';
 
   return Object.freeze({
     signalId: candidate.signalId ?? candidate.uniqueKey,

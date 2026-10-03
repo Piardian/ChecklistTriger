@@ -20,14 +20,16 @@ import { evaluateSetupIntelligenceV2 } from '../src/setupIntelligenceEvaluator';
 import { compareV1GradeWithV2Assessment, SetupAssessmentComparison } from '../src/setupAssessmentComparison';
 import { DetectorResult, SetupAssessment } from '../src/setupAssessment';
 import { recordPipelineFilterTelemetry, recordPoiLifecycleTelemetry } from './telemetry';
-import { Symbol } from './universe';
+import { Symbol, isSymbolBlacklisted } from './universe';
 import { getPipSize, calculateDistance, detectAssetClass, isBoxTooNarrow } from '../src/assetMetrics';
 import { consolidateCandidates } from '../src/poiConsolidator';
-import { detectLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
+import { detectLiquidityMagnet, resolveDisplayLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
+import { evaluateApproachVelocity, ApproachVelocityInfo } from '../src/approachVelocity';
 import { isPoiInvalidated as evaluatePoiInvalidation } from '../src/poiValidity';
 import { SMC_ADMISSION_RULEBOOK_VERSION, getPoiTtlMs, getMinimumDisplacementGradePoints, getDistanceRule } from '../src/smcAdmissionRulebook';
 import { appendResearchPoiEvaluation, researchPoiInputBase } from './researchLedger';
+import { ActivePoiWatchlist } from './activePoiWatchlist';
 
 export interface NotificationCandidate {
   symbol: Symbol;
@@ -61,6 +63,67 @@ export interface NotificationCandidate {
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
   modelState?: ModelState | null;
+  approachVelocity?: ApproachVelocityInfo;
+}
+
+export function evaluateLiquidityRunway(
+  symbol: Symbol,
+  tradeDirection: 'long' | 'short',
+  zone: { low: number; high: number },
+  liquidityMagnet?: LiquidityMagnet | null,
+  opposingObstacle?: OpposingObstacle | null
+): { allowed: boolean; runwayR: number | null; barrierType: string | null } {
+  const pip = getPipSize(symbol);
+  const entryMidpoint = (zone.low + zone.high) / 2;
+  const invalidationStop = tradeDirection === 'long' ? (zone.low - pip) : (zone.high + pip);
+  const riskDistance = Math.abs(entryMidpoint - invalidationStop);
+
+  if (riskDistance <= 0) {
+    return { allowed: true, runwayR: null, barrierType: null };
+  }
+
+  let nearestBarrierDistance: number | null = null;
+  let barrierType: string | null = null;
+
+  // 1. Check Opposing Obstacle (e.g. Opposing Order Block or FVG)
+  if (opposingObstacle && opposingObstacle.hasObstacle && opposingObstacle.level) {
+    const obstacleBoundary = tradeDirection === 'long'
+      ? opposingObstacle.level.low
+      : opposingObstacle.level.high;
+    const isAhead = tradeDirection === 'long'
+      ? obstacleBoundary > entryMidpoint
+      : obstacleBoundary < entryMidpoint;
+    if (isAhead) {
+      const dist = Math.abs(obstacleBoundary - entryMidpoint);
+      nearestBarrierDistance = dist;
+      barrierType = opposingObstacle.obstacleType ?? 'OPPOSING_OBSTACLE';
+    }
+  }
+
+  // 2. Check Liquidity Magnet (e.g. EQH or EQL cluster)
+  if (liquidityMagnet && liquidityMagnet.isActive) {
+    const isAhead = tradeDirection === 'long'
+      ? liquidityMagnet.priceLevel > entryMidpoint
+      : liquidityMagnet.priceLevel < entryMidpoint;
+    if (isAhead) {
+      const dist = Math.abs(liquidityMagnet.priceLevel - entryMidpoint);
+      if (nearestBarrierDistance === null || dist < nearestBarrierDistance) {
+        nearestBarrierDistance = dist;
+        barrierType = liquidityMagnet.type;
+      }
+    }
+  }
+
+  if (nearestBarrierDistance !== null) {
+    const runwayR = nearestBarrierDistance / riskDistance;
+    // Minimum 1.8R threshold: entering when nearest obstacle/magnet is < 1.8R is a mathematical trap
+    if (runwayR < 1.8) {
+      return { allowed: false, runwayR, barrierType };
+    }
+    return { allowed: true, runwayR, barrierType };
+  }
+
+  return { allowed: true, runwayR: null, barrierType: null };
 }
 
 export function runPipeline(
@@ -160,6 +223,12 @@ export function runPipeline(
     });
     return candidates;
   };
+
+  // 0. Blacklist Guard: Skip permanently blacklisted toxic pairs (e.g. GBPCHF)
+  if (isSymbolBlacklisted(symbol)) {
+    reject('symbol_blacklisted');
+    return finish([]);
+  }
 
   // 1. Pull 4h, 1h, 15m candles. SMC structure is evaluated only on closed candles.
   const candles4H = filterClosedCandles(candleStore.getCandles(symbol, '4h'), 4 * 60 * 60 * 1000, analysisTimestamp);
@@ -262,13 +331,16 @@ export function runPipeline(
       '15m'
     );
     const modelState = determineModel(structureState15m, sweeps, lastIndex15m, origin);
-    const liquidityMagnet = detectLiquidityMagnet(
+    const liquidityMagnet = resolveDisplayLiquidityMagnet(
       swings15m,
       currentPrice,
       tradeDirection,
       symbol,
       candles15mCast,
-      lastIndex15m
+      lastIndex15m,
+      swings1H,
+      candles1HCast,
+      lastIndex1H
     );
     const opposingObstacle = detectOpposingObstacle({
       symbol,
@@ -349,6 +421,47 @@ export function runPipeline(
       stage: candidateEligible ? 'CANDIDATE' : gradeResult ? 'GRADED_REJECTED' : 'FILTER_REJECTED',
       setupQualityVersion: setupAssessmentV2?.decision.rulebookVersion ?? null,
     }));
+
+    const isFatalRejection = blockingRules.some(r =>
+      r === 'poi_expired_ttl_48h' ||
+      r === 'poi_or_structure_direction_conflict' ||
+      r === '15m_displacement_insufficient' ||
+      r === 'insufficient_liquidity_runway'
+    );
+    const isDuplicate = blockingRules.includes('duplicate_poi');
+
+    try {
+      if (isInvalidated) {
+        ActivePoiWatchlist.getInstance().registerOrUpdatePoi({
+          symbol,
+          timeframe: '15m',
+          poiType,
+          direction: tradeDirection,
+          low: zone.low,
+          high: zone.high,
+          formedTimestamp,
+          breakTimestamp: origin.breakTimestamp,
+          testCount: poiTestCount,
+          isInvalidated: true,
+        });
+      } else if (!isFatalRejection && poiTestCount < 3) {
+        ActivePoiWatchlist.getInstance().registerOrUpdatePoi({
+          symbol,
+          timeframe: '15m',
+          poiType,
+          direction: tradeDirection,
+          low: zone.low,
+          high: zone.high,
+          formedTimestamp,
+          breakTimestamp: origin.breakTimestamp,
+          testCount: poiTestCount,
+          isInvalidated: false,
+          isNotified: isDuplicate,
+        });
+      }
+    } catch {
+      // Safe fallback if persistence encounters temporary disk lock
+    }
   };
 
   // Process OBs
@@ -426,13 +539,16 @@ export function runPipeline(
     // Tests count
     const poiTestResult = countOBTests(candles15mCast, ob, lastIndex15m);
 
-    const liquidityMagnet = detectLiquidityMagnet(
+    const liquidityMagnet = resolveDisplayLiquidityMagnet(
       swings15m,
       candles15mCast[lastIndex15m].close,
       tradeDirection,
       symbol,
       candles15mCast,
-      lastIndex15m
+      lastIndex15m,
+      swings1H,
+      candles1HCast,
+      lastIndex1H
     );
     const opposingObstacle = detectOpposingObstacle({
       symbol,
@@ -458,6 +574,24 @@ export function runPipeline(
       dq,
       pd1H
     );
+
+    const approachVelocity = evaluateApproachVelocity(
+      candles15mCast,
+      lastIndex15m,
+      tradeDirection,
+      ob.low,
+      ob.high,
+      symbol,
+      atrPips
+    );
+
+    // Minimum 1.8R Liquidity Runway Filter (Item 2)
+    const runwayCheck = evaluateLiquidityRunway(symbol, tradeDirection, { low: ob.low, high: ob.high }, liquidityMagnet, opposingObstacle);
+    if (!runwayCheck.allowed) {
+      reject('insufficient_liquidity_runway');
+      observePoiLifecycle('OB', ob, formedTimestamp, ['insufficient_liquidity_runway']);
+      continue;
+    }
 
     // Build GradeInput
     const gradeInput: GradeInput = {
@@ -571,6 +705,7 @@ export function runPipeline(
         liquidityMagnet,
         opposingObstacle,
         modelState,
+        approachVelocity,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
@@ -656,13 +791,16 @@ export function runPipeline(
     // Tests count
     const poiTestResult = countFVGTests(candles15mCast, fvg, lastIndex15m);
 
-    const liquidityMagnet = detectLiquidityMagnet(
+    const liquidityMagnet = resolveDisplayLiquidityMagnet(
       swings15m,
       candles15mCast[lastIndex15m].close,
       tradeDirection,
       symbol,
       candles15mCast,
-      lastIndex15m
+      lastIndex15m,
+      swings1H,
+      candles1HCast,
+      lastIndex1H
     );
     const opposingObstacle = detectOpposingObstacle({
       symbol,
@@ -688,6 +826,24 @@ export function runPipeline(
       dq,
       pd1H
     );
+
+    const approachVelocity = evaluateApproachVelocity(
+      candles15mCast,
+      lastIndex15m,
+      tradeDirection,
+      fvg.gapLow,
+      fvg.gapHigh,
+      symbol,
+      atrPips
+    );
+
+    // Minimum 1.8R Liquidity Runway Filter (Item 2)
+    const runwayCheck = evaluateLiquidityRunway(symbol, tradeDirection, { low: fvg.gapLow, high: fvg.gapHigh }, liquidityMagnet, opposingObstacle);
+    if (!runwayCheck.allowed) {
+      reject('insufficient_liquidity_runway');
+      observePoiLifecycle('FVG', fvg, formedTimestamp, ['insufficient_liquidity_runway']);
+      continue;
+    }
 
     // Build GradeInput
     const gradeInput: GradeInput = {
@@ -800,6 +956,7 @@ export function runPipeline(
         admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
+        approachVelocity,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);

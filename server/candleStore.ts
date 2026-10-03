@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Symbol } from './universe';
 export type { Symbol } from './universe';
+import type { SignalOutcomeType } from '../src/signalOutcome';
 
 export type Timeframe = '1m' | '15m' | '1h' | '4h';
 
@@ -156,11 +157,12 @@ export class CandleStore {
 }
 
 function normalizeOutcomeType(
-  outcomeType: 'WAITING_ENTRY' | 'ENTRY_TRIGGERED' | 'TAKE_PROFIT' | 'STOP_LOSS' | 'EXPIRED' | 'CANCELLED' | 'MANUAL_CANCELLED' | 'UNKNOWN'
+  outcomeType: SignalOutcomeType
 ): 'TP' | 'SL' | 'BE' | 'MANUAL' | 'EXPIRED' | 'CANCELLED' | 'UNKNOWN' {
   switch (outcomeType) {
     case 'TAKE_PROFIT': return 'TP';
     case 'STOP_LOSS': return 'SL';
+    case 'BREAK_EVEN': return 'BE';
     case 'EXPIRED': return 'EXPIRED';
     case 'CANCELLED': return 'CANCELLED';
     case 'MANUAL_CANCELLED': return 'MANUAL';
