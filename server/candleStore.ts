@@ -107,16 +107,23 @@ export class CandleStore {
     const filePath = this.getFilePath(symbol, timeframe);
     if (!fs.existsSync(filePath)) return [];
 
-    try {
-      const content = fs.readFileSync(filePath, 'utf8');
-      const parsed: unknown = JSON.parse(content);
-      if (!Array.isArray(parsed) || !parsed.every(isStoredCandle)) {
-        throw new Error('file does not contain a valid candle array');
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const parsed: unknown = JSON.parse(content);
+        if (!Array.isArray(parsed) || !parsed.every(isStoredCandle)) {
+          throw new Error('file does not contain a valid candle array');
+        }
+        return parsed;
+      } catch (error) {
+        lastError = error;
+        // Pause briefly before retrying in case of concurrent file write/lock
+        const start = Date.now();
+        while (Date.now() - start < 50) {}
       }
-      return parsed;
-    } catch (error) {
-      throw new Error(`[CandleStore] Failed to read ${filePath}: ${error instanceof Error ? error.message : String(error)}`);
     }
+    throw new Error(`[CandleStore] Failed to read ${filePath}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
   }
 
   private async processOutcomeTracking(symbol: string, candles: readonly StoredCandle[]): Promise<void> {
