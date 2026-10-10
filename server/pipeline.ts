@@ -23,7 +23,7 @@ import { recordPipelineFilterTelemetry, recordPoiLifecycleTelemetry } from './te
 import { Symbol, isSymbolBlacklisted } from './universe';
 import { getPipSize, calculateDistance, detectAssetClass, isBoxTooNarrow } from '../src/assetMetrics';
 import { consolidateCandidates } from '../src/poiConsolidator';
-import { detectLiquidityMagnet, resolveDisplayLiquidityMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
+import { detectLiquidityMagnet, resolveDisplayLiquidityMagnet, detectInducementMagnet, LiquidityMagnet } from '../src/liquidityMagnetDetector';
 import { detectOpposingObstacle, OpposingObstacle } from '../src/opposingObstacleDetector';
 import { evaluateApproachVelocity, ApproachVelocityInfo } from '../src/approachVelocity';
 import { isPoiInvalidated as evaluatePoiInvalidation } from '../src/poiValidity';
@@ -63,6 +63,7 @@ export interface NotificationCandidate {
   admissionRulebookVersion?: string;
   liquidityMagnet?: LiquidityMagnet | null;
   opposingObstacle?: OpposingObstacle | null;
+  inducementMagnet?: LiquidityMagnet | null;
   modelState?: ModelState | null;
   approachVelocity?: ApproachVelocityInfo;
 }
@@ -618,6 +619,21 @@ export function runPipeline(
       continue;
     }
 
+    // Inducement Magnet Trap Filter (Item 1)
+    const inducementMagnet = detectInducementMagnet(
+      swings15m,
+      { low: ob.low, high: ob.high },
+      tradeDirection,
+      symbol,
+      candles15mCast,
+      lastIndex15m
+    );
+    if (inducementMagnet && inducementMagnet.isActive) {
+      reject('inducement_liquidity_trap');
+      observePoiLifecycle('OB', ob, formedTimestamp, ['inducement_liquidity_trap']);
+      continue;
+    }
+
     // Build GradeInput
     const gradeInput: GradeInput = {
       tradeDirection,
@@ -729,6 +745,7 @@ export function runPipeline(
         admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
+        inducementMagnet,
         modelState,
         approachVelocity,
       });
@@ -870,6 +887,21 @@ export function runPipeline(
       continue;
     }
 
+    // Inducement Magnet Trap Filter (Item 1)
+    const inducementMagnet = detectInducementMagnet(
+      swings15m,
+      { low: fvg.gapLow, high: fvg.gapHigh },
+      tradeDirection,
+      symbol,
+      candles15mCast,
+      lastIndex15m
+    );
+    if (inducementMagnet && inducementMagnet.isActive) {
+      reject('inducement_liquidity_trap');
+      observePoiLifecycle('FVG', fvg, formedTimestamp, ['inducement_liquidity_trap']);
+      continue;
+    }
+
     // Build GradeInput
     const gradeInput: GradeInput = {
       tradeDirection,
@@ -981,6 +1013,7 @@ export function runPipeline(
         admissionRulebookVersion: SMC_ADMISSION_RULEBOOK_VERSION,
         liquidityMagnet,
         opposingObstacle,
+        inducementMagnet,
         approachVelocity,
       });
     } else {

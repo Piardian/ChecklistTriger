@@ -136,9 +136,27 @@ class HistoricalReplayCandleStore extends CandleStore {
             ? this.dataset.candles4h
             : [];
 
-    return source
-      .filter(candle => candle.timestamp <= this.cutoffTimestamp)
-      .map(candle => ({ ...candle }));
+    if (source.length === 0) return [];
+
+    // Binary search to find upper bound index where timestamp <= cutoffTimestamp
+    let low = 0;
+    let high = source.length - 1;
+    let foundIdx = -1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (source[mid].timestamp <= this.cutoffTimestamp) {
+        foundIdx = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    if (foundIdx < 0) return [];
+
+    // Match live production CandleStore buffer limit (500 candles max)
+    const startIdx = Math.max(0, foundIdx - 499);
+    return source.slice(startIdx, foundIdx + 1);
   }
 }
 
@@ -197,7 +215,12 @@ export function runHistoricalMarketReplay(
   let skippedMarketWindowSteps = 0;
   let skippedKillzoneSteps = 0;
 
+  let stepIdx = 0;
   for (const candle of replayCandles) {
+    stepIdx += 1;
+    if (stepIdx % 1000 === 0 || stepIdx === replayCandles.length) {
+      console.log(`[Replay:${normalizedDataset.symbol}] ${stepIdx}/${replayCandles.length} bars (${new Date(candle.timestamp).toISOString().split('T')[0]}) trades=${trades.length}`);
+    }
     candleStore.setCutoffTimestamp(candle.timestamp);
 
     if (respectMarketWindow) {

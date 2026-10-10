@@ -99,6 +99,11 @@ function evaluateEntryValidation(candidate: NotificationCandidate, rejectionReas
     return 'FAIL';
   }
 
+  if (candidate.inducementMagnet?.isActive) {
+    rejectionReason.push('active inducement liquidity cluster exists behind the stop loss');
+    return 'FAIL';
+  }
+
   if (!candidate.gradeResult.entryAllowed) {
     rejectionReason.push('grade engine did not permit entry');
     return 'FAIL';
@@ -146,6 +151,22 @@ function evaluateHtfConsistency(candidate: NotificationCandidate, rejectionReaso
     (direction === 'short' && candidate.pd4H === 'discount');
   if (direct4HPdConflict) {
     rejectionReason.push('4H premium/discount context conflicts with the trade');
+    return 'FAIL';
+  }
+
+  const direct1HPdConflict =
+    (direction === 'long' && candidate.pd1H === 'premium') ||
+    (direction === 'short' && candidate.pd1H === 'discount');
+  if (direct1HPdConflict) {
+    rejectionReason.push('1H premium/discount context conflicts with the trade');
+    return 'FAIL';
+  }
+
+  const direct15MPdConflict =
+    (direction === 'long' && candidate.pd15M === 'premium' && candidate.pd1H !== 'discount') ||
+    (direction === 'short' && candidate.pd15M === 'discount' && candidate.pd1H !== 'premium');
+  if (direct15MPdConflict) {
+    rejectionReason.push('15M premium/discount context conflicts with the trade');
     return 'FAIL';
   }
 

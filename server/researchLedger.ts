@@ -59,6 +59,9 @@ export interface ResearchPoiEvaluation {
 const seenKeys = new Set<string>();
 
 export function appendResearchPoiEvaluation(input: Omit<ResearchPoiEvaluation, 'schemaVersion' | 'recordId'>): void {
+  if (process.env.ENABLE_RESEARCH_LEDGER === 'false' || process.env.ENABLE_TELEMETRY === 'false' || process.env.IS_REPLAY === 'true') {
+    return;
+  }
   const recordId = [input.symbol, input.timeframe, input.poiType, input.poi.formedTimestamp, input.observedAt, input.stage, input.blockingRules.join('|')].join(':');
   if (seenKeys.has(recordId)) return;
   seenKeys.add(recordId);

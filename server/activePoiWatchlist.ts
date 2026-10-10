@@ -260,6 +260,9 @@ export class ActivePoiWatchlist {
   }
 
   public save(): void {
+    if (process.env.ENABLE_TELEMETRY === 'false' || process.env.IS_REPLAY === 'true') {
+      return;
+    }
     try {
       if (!fs.existsSync(this.dataDir)) {
         fs.mkdirSync(this.dataDir, { recursive: true });
