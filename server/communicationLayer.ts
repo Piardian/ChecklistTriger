@@ -182,9 +182,8 @@ function buildSections(
       field('Aksiyon', candidate.approachVelocity?.isHighKineticEnergy
         ? '⚠️ Yüksek kinetik enerji / haber mumuyla yaklaşım. Kutu içinde 1M taban/tavan oluşturmadan kesinlikle işlem yok.'
         : actionLine),
-      field('Onay', candidate.approachVelocity?.isHighKineticEnergy
-        ? 'Fiyat agresif yaklaştı; önce bölgede momentumun durulması ve 1M CHoCH/FVG teyidi zorunludur.'
-        : confirmationLine),
+      field('Onay', confirmationLine),
+      field('1M Sniper', '15M kutusunda 1M SFP + Breaker + iFVG teyidi bekle; dinamik 0.5 Fib seviyesine emir at.'),
       field('Kâr Yönetimi', `TP1 (${formatPrice(signal.tp1Price, candidate.symbol)}) seviyesinde Stop Girişe (BE) çekilir ve %50 kâr alınır. Kalan pozisyon TP2 (${formatPrice(signal.tp2Price, candidate.symbol)}) veya TP3 Mıknatısına sürülür.`),
     ]),
     section('NEDEN?', [

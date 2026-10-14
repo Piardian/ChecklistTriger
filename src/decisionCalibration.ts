@@ -27,6 +27,7 @@ export interface DecisionCalibrationInput {
     readonly sweep: number;
     readonly poiQuality: number;
   };
+  readonly allowTrendContinuationPD?: boolean;
 }
 
 export interface DecisionCalibrationCheck {
@@ -55,8 +56,8 @@ export function calibrateDecision(input: DecisionCalibrationInput): DecisionCali
       '4H Premium/Discount must support the trade direction.',
       input.tradeDirection,
       input.pd4H,
-      true,
-      false,
+      !input.allowTrendContinuationPD,
+      Boolean(input.allowTrendContinuationPD),
       true
     ),
     premiumDiscountCheck(

@@ -6,6 +6,19 @@ import type { SignalOutcome } from './signalOutcome';
 import { createSignalOutcome } from './signalOutcome';
 import type { CompletedSignalOutcomeEvaluationEvidence, EvaluatedCandlePathPoint } from './signalEvidence';
 import { getPipSize as getAssetPipSize } from './assetMetrics';
+import {
+  calculateDynamicStopBuffer,
+  isSliceThroughCandle,
+  evaluateEntryCandleReaction,
+  calculateCeEntry,
+} from './entryMechanics';
+
+export {
+  calculateDynamicStopBuffer,
+  isSliceThroughCandle,
+  evaluateEntryCandleReaction,
+  calculateCeEntry,
+};
 
 export interface OutcomeEvaluationPlan {
   readonly entryPrice: number;
@@ -17,6 +30,7 @@ export interface OutcomeEvaluationPlan {
   readonly sameCandleResolution: 'STOP_LOSS_FIRST';
   readonly entryMode?: 'midpoint' | 'zone_touch';
   readonly targetRMultiple?: number;
+  readonly dynamicBuffer?: boolean;
 }
 
 export interface OutcomeTrackingResult {
@@ -45,6 +59,8 @@ export interface OutcomeTrackerOptions {
   readonly entryMode?: 'midpoint' | 'zone_touch';
   readonly includePricePath?: boolean;
   readonly breakEvenTriggerR?: number;
+  readonly dynamicBuffer?: boolean;
+  readonly requireReaction?: boolean;
 }
 
 interface PersistedTrackedSignal {
@@ -72,11 +88,16 @@ export function buildResearchOutcomePlan(
   const targetRMultiple = positiveNumber(options.targetRMultiple, DEFAULT_TARGET_R_MULTIPLE);
   const zone = resolveZone(candidate);
   const entryMode = options.entryMode ?? 'midpoint';
+  const pipSize = getAssetPipSize(candidate.symbol);
+
+  const useDynamicBuffer = options.dynamicBuffer ?? (process.env.DYNAMIC_BUFFER === 'true');
+  const invalidationBuffer = useDynamicBuffer
+    ? calculateDynamicStopBuffer(candidate.symbol, zone.low, zone.high)
+    : invalidationBufferPips * pipSize;
+
   const entryPrice = entryMode === 'zone_touch'
     ? (candidate.tradeDirection === 'long' ? zone.high : zone.low)
     : (zone.low + zone.high) / 2;
-  const pipSize = getAssetPipSize(candidate.symbol);
-  const invalidationBuffer = invalidationBufferPips * pipSize;
 
   if (candidate.tradeDirection === 'long') {
     const stopPrice = zone.low - invalidationBuffer;
@@ -91,6 +112,7 @@ export function buildResearchOutcomePlan(
       sameCandleResolution: 'STOP_LOSS_FIRST',
       entryMode,
       targetRMultiple,
+      dynamicBuffer: useDynamicBuffer,
     });
   }
 
@@ -106,6 +128,7 @@ export function buildResearchOutcomePlan(
     sameCandleResolution: 'STOP_LOSS_FIRST',
     entryMode,
     targetRMultiple,
+    dynamicBuffer: useDynamicBuffer,
   });
 }
 
@@ -118,11 +141,33 @@ export function evaluateOutcome(
   const startTimestamp = candidate.validationCloseTimestamp ?? candidate.marketDataTimestamp ?? candidate.poi.relatedEvent.breakTimestamp;
   const future = normalizeFutureCandles(candles, startTimestamp);
   const includePricePath = options.includePricePath === true;
+  const isLong = candidate.tradeDirection === 'long';
+  const requireReaction = options.requireReaction ?? (process.env.REQUIRE_ENTRY_REACTION === 'true');
+  const zone = resolveZone(candidate);
 
   let entryIndex = -1;
   for (let index = 0; index < Math.min(plan.entryWindowBars, future.length); index += 1) {
     const candle = future[index];
+
+    // Pre-fill Stop Invalidation Check:
+    // If candle opened beyond stop loss or plunged through stop before reaching entry,
+    // cancel pending limit due to zone invalidation
+    const stopBreachedPrior = isLong
+      ? (candle.open <= plan.stopPrice || (candle.low <= plan.stopPrice && candle.open < plan.entryPrice))
+      : (candle.open >= plan.stopPrice || (candle.high >= plan.stopPrice && candle.open > plan.entryPrice));
+
+    if (stopBreachedPrior) {
+      break;
+    }
+
     if (candle.low <= plan.entryPrice && candle.high >= plan.entryPrice) {
+      // Reached entry level. If requireReaction is true, check slice-through momentum guard
+      if (requireReaction) {
+        const sliced = isSliceThroughCandle(candidate.tradeDirection, candle, zone.low, zone.high);
+        if (sliced) {
+          break; // Cancel limit due to high-momentum breach without reaction
+        }
+      }
       entryIndex = index;
       break;
     }

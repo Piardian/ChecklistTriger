@@ -66,6 +66,7 @@ export interface NotificationCandidate {
   inducementMagnet?: LiquidityMagnet | null;
   modelState?: ModelState | null;
   approachVelocity?: ApproachVelocityInfo;
+  allowTrendContinuationPD?: boolean;
 }
 
 export function evaluateLiquidityRunway(
@@ -748,6 +749,7 @@ export function runPipeline(
         inducementMagnet,
         modelState,
         approachVelocity,
+        allowTrendContinuationPD,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
@@ -1014,7 +1016,9 @@ export function runPipeline(
         liquidityMagnet,
         opposingObstacle,
         inducementMagnet,
+        modelState,
         approachVelocity,
+        allowTrendContinuationPD,
       });
     } else {
       recordGradeBlockOverlap(gradeResult.blockReasons);
