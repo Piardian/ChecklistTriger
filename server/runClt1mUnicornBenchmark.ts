@@ -280,8 +280,10 @@ export async function runClt1mUnicornBenchmark() {
   console.log(`   BE  (+0.5R)    : ${total15mBe}`);
   console.log(`   SL  (-1.0R)    : ${total15mSl}`);
   console.log(`   Resolved       : ${total15mResolved} | Unresolved: ${total15mUnresolved}`);
-  const wr15m = total15mResolved > 0 ? ((total15mTp2 + total15mBe) / total15mResolved * 100).toFixed(1) : 'N/A';
-  console.log(`   Resolved Win Rate: ${wr15m === 'N/A' ? wr15m : `%${wr15m}`}`);
+  const wr15m = total15mResolved > 0 ? (total15mTp2 / total15mResolved * 100).toFixed(1) : 'N/A';
+  const positive15m = total15mResolved > 0 ? ((total15mTp2 + total15mBe) / total15mResolved * 100).toFixed(1) : 'N/A';
+  console.log(`   TP2 Win Rate    : ${wr15m === 'N/A' ? wr15m : `%${wr15m}`}`);
+  console.log(`   TP2 + BE Rate   : ${positive15m === 'N/A' ? positive15m : `%${positive15m}`}`);
   console.log(`   Net R Getirisi : ${total15mNetR >= 0 ? '+' : ''}${total15mNetR.toFixed(1)} R`);
   console.log('-'.repeat(85));
   console.log('2) CLT 1M UNICORN SNIPER MODELİ (Entegre Edilen Yeni Mekanizma):');
@@ -290,8 +292,10 @@ export async function runClt1mUnicornBenchmark() {
   console.log(`   🛡️ TP1 + BE    : ${total1mBe} adet (+0.5R)`);
   console.log(`   🛑 Stop Loss   : ${total1mSl} adet (-1.0R)`);
   console.log(`   Resolved       : ${total1mResolved} | Time exits: ${total1mTimeExit}`);
-  const wr1m = total1mResolved > 0 ? ((total1mTp2 + total1mBe) / total1mResolved * 100).toFixed(1) : 'N/A';
-  console.log(`   Resolved Win Rate: ${wr1m === 'N/A' ? wr1m : `%${wr1m}`}`);
+  const wr1m = total1mResolved > 0 ? (total1mTp2 / total1mResolved * 100).toFixed(1) : 'N/A';
+  const positive1m = total1mResolved > 0 ? ((total1mTp2 + total1mBe) / total1mResolved * 100).toFixed(1) : 'N/A';
+  console.log(`   TP2 Win Rate    : ${wr1m === 'N/A' ? wr1m : `%${wr1m}`}`);
+  console.log(`   TP2 + BE Rate   : ${positive1m === 'N/A' ? positive1m : `%${positive1m}`}`);
   console.log(`   Net R Getirisi : ${total1mNetR >= 0 ? '+' : ''}${total1mNetR.toFixed(1)} R`);
   console.log('='.repeat(85) + '\n');
 }
