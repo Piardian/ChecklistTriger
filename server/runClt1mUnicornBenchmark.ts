@@ -84,12 +84,16 @@ export async function runClt1mUnicornBenchmark() {
   const symbols: Symbol[] = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCAD', 'XAUUSD'];
 
   let total15mSignals = 0;
+  let total15mResolved = 0;
+  let total15mUnresolved = 0;
   let total15mTp2 = 0;
   let total15mBe = 0;
   let total15mSl = 0;
   let total15mNetR = 0;
 
   let total1mFilled = 0;
+  let total1mResolved = 0;
+  let total1mTimeExit = 0;
   let total1mTp2 = 0;
   let total1mBe = 0;
   let total1mSl = 0;
@@ -166,6 +170,9 @@ export async function runClt1mUnicornBenchmark() {
             outcome15mStr = 'SL (-1.0R)';
           }
           total15mNetR += r15m;
+          total15mResolved += 1;
+        } else {
+          total15mUnresolved += 1;
         }
 
         // 2. Yeni Geliştirilen 1M UNICORN SNIPER Modeli Değerlendirmesi
@@ -244,9 +251,11 @@ export async function runClt1mUnicornBenchmark() {
               outcome1mStr = '🛡️ BE (+0.5R)';
             } else {
               outcome1mStr = 'TIME_EXIT (+0.0R)';
+              total1mTimeExit += 1;
             }
           }
           total1mNetR += r1m;
+          total1mResolved += 1;
         } else {
           total1mVetoed += 1;
           outcome1mStr = `⛔ ${m1Eval.reason}`;
@@ -270,8 +279,11 @@ export async function runClt1mUnicornBenchmark() {
   console.log(`   TP2 (+2.0R)    : ${total15mTp2}`);
   console.log(`   BE  (+0.5R)    : ${total15mBe}`);
   console.log(`   SL  (-1.0R)    : ${total15mSl}`);
-  const wr15m = total15mSignals > 0 ? ((total15mTp2 + total15mBe) / total15mSignals * 100).toFixed(1) : '0';
-  console.log(`   Win Rate       : %${wr15m}`);
+  console.log(`   Resolved       : ${total15mResolved} | Unresolved: ${total15mUnresolved}`);
+  const wr15m = total15mResolved > 0 ? (total15mTp2 / total15mResolved * 100).toFixed(1) : 'N/A';
+  const positive15m = total15mResolved > 0 ? ((total15mTp2 + total15mBe) / total15mResolved * 100).toFixed(1) : 'N/A';
+  console.log(`   TP2 Win Rate    : ${wr15m === 'N/A' ? wr15m : `%${wr15m}`}`);
+  console.log(`   TP2 + BE Rate   : ${positive15m === 'N/A' ? positive15m : `%${positive15m}`}`);
   console.log(`   Net R Getirisi : ${total15mNetR >= 0 ? '+' : ''}${total15mNetR.toFixed(1)} R`);
   console.log('-'.repeat(85));
   console.log('2) CLT 1M UNICORN SNIPER MODELİ (Entegre Edilen Yeni Mekanizma):');
@@ -279,8 +291,11 @@ export async function runClt1mUnicornBenchmark() {
   console.log(`   🎯 Tam TP2     : ${total1mTp2} adet (+2.0R)`);
   console.log(`   🛡️ TP1 + BE    : ${total1mBe} adet (+0.5R)`);
   console.log(`   🛑 Stop Loss   : ${total1mSl} adet (-1.0R)`);
-  const wr1m = total1mFilled > 0 ? ((total1mTp2 + total1mBe) / total1mFilled * 100).toFixed(1) : '0';
-  console.log(`   Win Rate       : %${wr1m}`);
+  console.log(`   Resolved       : ${total1mResolved} | Time exits: ${total1mTimeExit}`);
+  const wr1m = total1mResolved > 0 ? (total1mTp2 / total1mResolved * 100).toFixed(1) : 'N/A';
+  const positive1m = total1mResolved > 0 ? ((total1mTp2 + total1mBe) / total1mResolved * 100).toFixed(1) : 'N/A';
+  console.log(`   TP2 Win Rate    : ${wr1m === 'N/A' ? wr1m : `%${wr1m}`}`);
+  console.log(`   TP2 + BE Rate   : ${positive1m === 'N/A' ? positive1m : `%${positive1m}`}`);
   console.log(`   Net R Getirisi : ${total1mNetR >= 0 ? '+' : ''}${total1mNetR.toFixed(1)} R`);
   console.log('='.repeat(85) + '\n');
 }
