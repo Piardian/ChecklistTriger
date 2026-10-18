@@ -172,8 +172,9 @@ function buildSections(
       field('Mesafe', signal.distanceText),
       field('Stop', signal.stopLossText),
       field('TP1 (+1.0R / BE)', signal.tp1Text),
-      field('TP2 (+2.0R)', signal.tp2Text),
+      field('TP2 (+2.0R / Ana Hedef)', signal.tp2Text),
       field('TP3 (Mıknatıs)', signal.tp3Text),
+      field('Asgari Risk/Kazanç', '1:2.0R (Min 2.0R Onaylı)'),
       ...(candidate.approachVelocity && candidate.approachVelocity.isHighKineticEnergy
         ? [field('İvme Uyarısı', candidate.approachVelocity.warningText ?? 'Yüksek kinetik enerji tespit edildi.')]
         : []),
@@ -184,7 +185,7 @@ function buildSections(
         : actionLine),
       field('Onay', confirmationLine),
       field('1M Sniper', '15M kutusunda 1M SFP + Breaker + iFVG teyidi bekle; dinamik 0.5 Fib seviyesine emir at.'),
-      field('Kâr Yönetimi', `TP1 (${formatPrice(signal.tp1Price, candidate.symbol)}) seviyesinde Stop Girişe (BE) çekilir ve %50 kâr alınır. Kalan pozisyon TP2 (${formatPrice(signal.tp2Price, candidate.symbol)}) veya TP3 Mıknatısına sürülür.`),
+      field('Kâr Yönetimi', `TP1 (${formatPrice(signal.tp1Price, candidate.symbol)}) seviyesinde Stop Girişe (BE) çekilir ve %50 kâr alınır. Kalan pozisyon 1:2R Ana Hedef TP2 (${formatPrice(signal.tp2Price, candidate.symbol)}) veya TP3 Mıknatısına sürülür.`),
     ]),
     section('NEDEN?', [
       field('Kısa sebep', reasonSummary),
@@ -589,7 +590,7 @@ export function extractCandidateDisplay(candidate: NotificationCandidate) {
     ? `${formatPrice(invalidationStop, candidate.symbol)} (-1.0R / ${riskPips} pip risk - Bölge Altı)`
     : `${formatPrice(invalidationStop, candidate.symbol)} (-1.0R / ${riskPips} pip risk - Bölge Üstü)`;
   const tp1Text = `${formatPrice(tp1Price, candidate.symbol)} (+1.0R | Stop Maliyete / BE)`;
-  const tp2Text = `${formatPrice(tp2Price, candidate.symbol)} (+2.0R | Ana Hedef)`;
+  const tp2Text = `${formatPrice(tp2Price, candidate.symbol)} (+2.0R | 1:2R Ana Hedef)`;
   const tp3Text = `${formatPrice(tp3Price, candidate.symbol)} (${tp3Label})`;
 
   return Object.freeze({

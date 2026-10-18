@@ -187,8 +187,10 @@ function resolveInvalidationRisk(
 
 function resolveMarketContext(timestamp: number): SignalQualityResult['marketContext'] {
   const context = resolveMarketSession(timestamp);
-  const killzone = context.dayOfWeek >= 1 && context.dayOfWeek <= 5 &&
-    ((context.hourLocal >= 10 && context.hourLocal < 13) || (context.hourLocal >= 15 && context.hourLocal < 19));
+  const killzone = process.env.DISABLE_KILLZONE_7_24 === 'true' || process.env.ENABLE_KILLZONE !== 'true'
+    ? true
+    : (context.dayOfWeek >= 1 && context.dayOfWeek <= 5 &&
+       ((context.hourLocal >= 10 && context.hourLocal < 13) || (context.hourLocal >= 15 && context.hourLocal < 19)));
   return {
     session: context.session,
     killzone,

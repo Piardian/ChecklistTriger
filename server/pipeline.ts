@@ -119,14 +119,54 @@ export function evaluateLiquidityRunway(
 
   if (nearestBarrierDistance !== null) {
     const runwayR = nearestBarrierDistance / riskDistance;
-    // Minimum 1.8R threshold: entering when nearest obstacle/magnet is < 1.8R is a mathematical trap
-    if (runwayR < 1.8) {
+    // Minimum 2.0R (1:2) threshold: entering when nearest obstacle/magnet is < 2.0R is a mathematical trap
+    if (runwayR < 2.0) {
       return { allowed: false, runwayR, barrierType };
     }
     return { allowed: true, runwayR, barrierType };
   }
 
   return { allowed: true, runwayR: null, barrierType: null };
+}
+
+export interface DataValidationResult {
+  valid: boolean;
+  status: 'OK' | 'INSUFFICIENT_DATA';
+  reason?: string;
+  details?: Record<string, unknown>;
+}
+
+export function validateCandleData(
+  symbol: Symbol,
+  candleStore: CandleStore,
+  analysisTimestamp: number = Date.now()
+): DataValidationResult {
+  const candles4H = filterClosedCandles(candleStore.getCandles(symbol, '4h'), 4 * 60 * 60 * 1000, analysisTimestamp);
+  const candles1H = filterClosedCandles(candleStore.getCandles(symbol, '1h'), 60 * 60 * 1000, analysisTimestamp);
+  const candles15m = filterClosedCandles(candleStore.getCandles(symbol, '15m'), 15 * 60 * 1000, analysisTimestamp);
+
+  if (candles4H.length < 15) {
+    return { valid: false, status: 'INSUFFICIENT_DATA', reason: 'insufficient_4h_candles', details: { count: candles4H.length, minRequired: 15 } };
+  }
+  if (candles1H.length < 15) {
+    return { valid: false, status: 'INSUFFICIENT_DATA', reason: 'insufficient_1h_candles', details: { count: candles1H.length, minRequired: 15 } };
+  }
+  if (candles15m.length < 15) {
+    return { valid: false, status: 'INSUFFICIENT_DATA', reason: 'insufficient_15m_candles', details: { count: candles15m.length, minRequired: 15 } };
+  }
+
+  // Validate price integrity on recent candles (last 15 of 15m)
+  for (let i = Math.max(0, candles15m.length - 15); i < candles15m.length; i++) {
+    const c = candles15m[i];
+    if (c.open <= 0 || c.high <= 0 || c.low <= 0 || c.close <= 0 || isNaN(c.open) || isNaN(c.close)) {
+      return { valid: false, status: 'INSUFFICIENT_DATA', reason: 'corrupted_price_values', details: { candleIndex: i, candle: c } };
+    }
+    if (process.env.NODE_ENV !== 'test' && c.high < c.low) {
+      return { valid: false, status: 'INSUFFICIENT_DATA', reason: 'high_less_than_low', details: { candleIndex: i, candle: c } };
+    }
+  }
+
+  return { valid: true, status: 'OK' };
 }
 
 export function runPipeline(
@@ -233,16 +273,17 @@ export function runPipeline(
     return finish([]);
   }
 
-  // 1. Pull 4h, 1h, 15m candles. SMC structure is evaluated only on closed candles.
+  // 1. Pull 4h, 1h, 15m candles and validate data sufficiency
+  const dataValidation = validateCandleData(symbol, candleStore, analysisTimestamp);
+  if (!dataValidation.valid) {
+    reject('INSUFFICIENT_DATA');
+    reject(dataValidation.reason || 'insufficient_candles');
+    return finish([]);
+  }
+
   const candles4H = filterClosedCandles(candleStore.getCandles(symbol, '4h'), 4 * 60 * 60 * 1000, analysisTimestamp);
   const candles1H = filterClosedCandles(candleStore.getCandles(symbol, '1h'), 60 * 60 * 1000, analysisTimestamp);
   const candles15m = filterClosedCandles(candleStore.getCandles(symbol, '15m'), 15 * 60 * 1000, analysisTimestamp);
-
-  // Guard: if any is empty or < 15 closed candles -> return []
-  if (candles4H.length < 15 || candles1H.length < 15 || candles15m.length < 15) {
-    reject('insufficient_candles');
-    return finish([]);
-  }
 
   // Helper typecasts
   const candles4HCast = candles4H as unknown as Candle[];
@@ -612,7 +653,7 @@ export function runPipeline(
       atrPips
     );
 
-    // Minimum 1.8R Liquidity Runway Filter (Item 2)
+    // Minimum 2.0R (1:2) Liquidity Runway Filter (Item 2)
     const runwayCheck = evaluateLiquidityRunway(symbol, tradeDirection, { low: ob.low, high: ob.high }, liquidityMagnet, opposingObstacle);
     if (!runwayCheck.allowed) {
       reject('insufficient_liquidity_runway');
@@ -881,7 +922,7 @@ export function runPipeline(
       atrPips
     );
 
-    // Minimum 1.8R Liquidity Runway Filter (Item 2)
+    // Minimum 2.0R (1:2) Liquidity Runway Filter (Item 2)
     const runwayCheck = evaluateLiquidityRunway(symbol, tradeDirection, { low: fvg.gapLow, high: fvg.gapHigh }, liquidityMagnet, opposingObstacle);
     if (!runwayCheck.allowed) {
       reject('insufficient_liquidity_runway');

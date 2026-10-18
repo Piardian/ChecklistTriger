@@ -14,8 +14,8 @@ function isTimeInWindow(currentMinutes: number, startStr: string, endStr: string
 }
 
 export function isWithinKillzone(now: Date = new Date()): { active: boolean; reason: string } {
-  if (process.env.ENABLE_KILLZONE !== 'true') {
-    return { active: true, reason: 'killzone_disabled' };
+  if (process.env.DISABLE_KILLZONE_7_24 === 'true' || process.env.ENABLE_KILLZONE !== 'true') {
+    return { active: true, reason: 'killzone_disabled_7_24' };
   }
 
   // Use Turkish Time (TRT, UTC+3)
@@ -75,8 +75,18 @@ export type KillzoneFilterMode = {
   filter: 'ACTIVE' | 'BYPASSED';
 };
 
-export function evaluateKillzoneFilter(now: Date = new Date()): KillzoneFilterMode {
-  const marketWindow = evaluateHardMarketWindow(now);
+export function evaluateKillzoneFilter(now: Date = new Date(), symbol?: string): KillzoneFilterMode {
+  // 7/24 Continuous Mode - Unconditionally active for 24/7 scanning
+  if (process.env.DISABLE_KILLZONE_7_24 === 'true' || process.env.ENABLE_KILLZONE !== 'true') {
+    return {
+      active: true,
+      reason: '7_24_continuous_mode',
+      profile: 'PRODUCTION',
+      filter: 'BYPASSED',
+    };
+  }
+
+  const marketWindow = evaluateHardMarketWindow(now, symbol);
   if (!marketWindow.active) {
     return {
       ...marketWindow,
@@ -108,11 +118,13 @@ export function isCryptoSymbol(symbol?: string): boolean {
 }
 
 /**
- * Non-bypassable market closure. PVP acceleration may relax intraday
- * killzones, but it must never create Friday-close/weekend/Monday-pre-open
- * notifications from stale or synthetic candles.
+ * Non-bypassable market closure. In 7/24 mode, this is bypassed.
  */
-export function evaluateHardMarketWindow(now: Date = new Date(), _symbol?: string): { active: boolean; reason: string } {
+export function evaluateHardMarketWindow(now: Date = new Date(), symbol?: string): { active: boolean; reason: string } {
+  if (process.env.DISABLE_KILLZONE_7_24 === 'true' || process.env.ENABLE_KILLZONE !== 'true') {
+    return { active: true, reason: '7_24_continuous_market_window' };
+  }
+
   const newYork = zonedParts(now, 'America/New_York');
   if (newYork.weekday === 'Fri' && newYork.hour >= 17) {
     return { active: false, reason: 'friday_new_york_closed' };

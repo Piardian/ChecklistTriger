@@ -65,7 +65,7 @@ function makeDummyCandidate(direction: 'long' | 'short' = 'long'): NotificationC
   } as NotificationCandidate;
 }
 
-describe('Item 2: Minimum 1.8R Liquidity Runway Filter', () => {
+describe('Item 2: Minimum 2.0R Liquidity Runway Filter (1:2 R:R)', () => {
   test('allows trade when open sky exists (no obstacles or magnets ahead)', () => {
     const res = evaluateLiquidityRunway(
       'EURUSD',
@@ -78,7 +78,7 @@ describe('Item 2: Minimum 1.8R Liquidity Runway Filter', () => {
     expect(res.runwayR).toBeNull();
   });
 
-  test('blocks long trade when active liquidity magnet is closer than 1.8R', () => {
+  test('blocks long trade when active liquidity magnet is closer than 2.0R', () => {
     // Entry midpoint: 1.0855. Stop: 1.0849 (low - 1 pip). Risk: 0.0006 (6 pips).
     // Magnet at 1.0863 (only 8 pips ahead = 1.33R).
     const magnet = {
@@ -97,7 +97,7 @@ describe('Item 2: Minimum 1.8R Liquidity Runway Filter', () => {
       null
     );
     expect(res.allowed).toBe(false);
-    expect(res.runwayR).toBeLessThan(1.8);
+    expect(res.runwayR).toBeLessThan(2.0);
     expect(res.barrierType).toBe('EQH');
   });
 
@@ -119,10 +119,10 @@ describe('Item 2: Minimum 1.8R Liquidity Runway Filter', () => {
       null
     );
     expect(res.allowed).toBe(true);
-    expect(res.runwayR).toBeGreaterThanOrEqual(1.8);
+    expect(res.runwayR).toBeGreaterThanOrEqual(2.0);
   });
 
-  test('blocks short trade when opposing obstacle is closer than 1.8R', () => {
+  test('blocks short trade when opposing obstacle is closer than 2.0R', () => {
     // Entry midpoint: 1.0855. Stop: 1.0861 (high + 1 pip). Risk: 0.0006.
     // Opposing Bullish OB level: low=1.0845, high=1.0848 (distance to high = 7 pips = 1.16R).
     const obstacle = {
@@ -141,7 +141,7 @@ describe('Item 2: Minimum 1.8R Liquidity Runway Filter', () => {
       obstacle
     );
     expect(res.allowed).toBe(false);
-    expect(res.runwayR).toBeLessThan(1.8);
+    expect(res.runwayR).toBeLessThan(2.0);
   });
 });
 
@@ -154,7 +154,7 @@ describe('Item 3: Numerical Targets and Break-Even Resolution', () => {
     expect(display.tp1Price).toBeCloseTo(1.0861, 4); // +1.0R (6 pips)
     expect(display.tp2Price).toBeCloseTo(1.0867, 4); // +2.0R (12 pips)
     expect(display.tp1Text).toContain('+1.0R | Stop Maliyete / BE');
-    expect(display.tp2Text).toContain('+2.0R | Ana Hedef');
+    expect(display.tp2Text).toContain('+2.0R | 1:2R Ana Hedef');
     expect(display.stopLossText).toContain('-1.0R');
   });
 
